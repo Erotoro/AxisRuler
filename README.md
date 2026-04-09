@@ -133,17 +133,6 @@ The mod aims to stay responsive and readable even when it becomes part of your e
 
 AxisRuler does not depend on server support, which makes it easy to keep in your standard client mod pack.
 
-## Screenshots
-
-Add screenshots here.
-
-Suggested shots:
-
-- in-world measurement between two points
-- HUD during active building
-- color palette and HUD customization
-- preset library screen
-
 ## Philosophy
 
 AxisRuler is built around precision, restraint, and usability.
