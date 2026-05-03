@@ -8,13 +8,13 @@ import com.axisruler.measure.MeasurementResult;
 import com.axisruler.measure.MeasurementService;
 import com.axisruler.measure.SelectionState;
 import com.axisruler.util.AxisRulerText;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.Optional;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.resource.language.I18n;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 public final class ClientInputHandler {
@@ -45,9 +45,9 @@ public final class ClientInputHandler {
         registered = true;
     }
 
-    private void onEndClientTick(MinecraftClient client) {
+    private void onEndClientTick(Minecraft client) {
         updateCurrentWorldKey(client);
-        if (client.player == null || client.currentScreen != null) {
+        if (client.player == null || client.screen != null) {
             consumeAllPendingKeyPresses();
             return;
         }
@@ -68,15 +68,15 @@ public final class ClientInputHandler {
         handleCopyMeasurement(client);
     }
 
-    private void updateCurrentWorldKey(MinecraftClient client) {
-        ClientWorld world = client.world;
+    private void updateCurrentWorldKey(Minecraft client) {
+        ClientLevel world = client.level;
         if (world == null || client.player == null) {
             lastWorldKey = null;
             measurementService.selectionState().setCurrentWorldKey(null);
             measurementService.selectionState().clearPoints();
             return;
         }
-        String worldKey = world.getRegistryKey().getValue().toString();
+        String worldKey = world.dimension().identifier().toString();
         if (lastWorldKey != null && !lastWorldKey.equals(worldKey)) {
             measurementService.selectionState().clearPoints();
         }
@@ -84,8 +84,8 @@ public final class ClientInputHandler {
         measurementService.selectionState().setCurrentWorldKey(worldKey);
     }
 
-    private void handleSetPointA(MinecraftClient client) {
-        while (keybindRegistrar.setPointA().wasPressed()) {
+    private void handleSetPointA(Minecraft client) {
+        while (keybindRegistrar.setPointA().consumeClick()) {
             Optional<MeasurePoint> point = targetingService.targetedBlock(client);
             if (point.isEmpty()) {
                 sendActionBar(client, AxisRulerText.noBlockTarget());
@@ -96,8 +96,8 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleSetPointB(MinecraftClient client) {
-        while (keybindRegistrar.setPointB().wasPressed()) {
+    private void handleSetPointB(Minecraft client) {
+        while (keybindRegistrar.setPointB().consumeClick()) {
             Optional<MeasurePoint> point = targetingService.targetedBlock(client);
             if (point.isEmpty()) {
                 sendActionBar(client, AxisRulerText.noBlockTarget());
@@ -108,15 +108,15 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleClearPoints(MinecraftClient client) {
-        while (keybindRegistrar.clearPoints().wasPressed()) {
+    private void handleClearPoints(Minecraft client) {
+        while (keybindRegistrar.clearPoints().consumeClick()) {
             measurementService.selectionState().clearPoints();
             sendActionBar(client, AxisRulerText.selectionCleared());
         }
     }
 
-    private void handleSwapPoints(MinecraftClient client) {
-        while (keybindRegistrar.swapPoints().wasPressed()) {
+    private void handleSwapPoints(Minecraft client) {
+        while (keybindRegistrar.swapPoints().consumeClick()) {
             if (measurementService.selectionState().swapPoints()) {
                 sendActionBar(client, AxisRulerText.pointsSwapped());
             } else {
@@ -125,16 +125,16 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleCycleMode(MinecraftClient client) {
-        while (keybindRegistrar.cycleMode().wasPressed()) {
+    private void handleCycleMode(Minecraft client) {
+        while (keybindRegistrar.cycleMode().consumeClick()) {
             SelectionState selectionState = measurementService.selectionState();
             selectionState.cycleMode();
             sendActionBar(client, AxisRulerText.mode(selectionState.mode()));
         }
     }
 
-    private void handleToggleHud(MinecraftClient client) {
-        while (keybindRegistrar.toggleHud().wasPressed()) {
+    private void handleToggleHud(Minecraft client) {
+        while (keybindRegistrar.toggleHud().consumeClick()) {
             SelectionState selectionState = measurementService.selectionState();
             selectionState.toggleHud();
             configManager.update(configManager.config().withHudEnabledDefault(selectionState.hudEnabled()));
@@ -142,8 +142,8 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleToggleGuides(MinecraftClient client) {
-        while (keybindRegistrar.toggleGuides().wasPressed()) {
+    private void handleToggleGuides(Minecraft client) {
+        while (keybindRegistrar.toggleGuides().consumeClick()) {
             SelectionState selectionState = measurementService.selectionState();
             selectionState.toggleGuides();
             configManager.update(configManager.config().withGuidesEnabledDefault(selectionState.guidesEnabled()));
@@ -151,8 +151,8 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleToggleLabels(MinecraftClient client) {
-        while (keybindRegistrar.toggleLabels().wasPressed()) {
+    private void handleToggleLabels(Minecraft client) {
+        while (keybindRegistrar.toggleLabels().consumeClick()) {
             SelectionState selectionState = measurementService.selectionState();
             selectionState.toggleLabels();
             configManager.update(configManager.config().withLabelsEnabledDefault(selectionState.labelsEnabled()));
@@ -160,8 +160,8 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleToggleLine(MinecraftClient client) {
-        while (keybindRegistrar.toggleLine().wasPressed()) {
+    private void handleToggleLine(Minecraft client) {
+        while (keybindRegistrar.toggleLine().consumeClick()) {
             SelectionState selectionState = measurementService.selectionState();
             selectionState.toggleLine();
             configManager.update(configManager.config().withLineEnabledDefault(selectionState.lineEnabled()));
@@ -169,8 +169,8 @@ public final class ClientInputHandler {
         }
     }
 
-    private void handleCopyMeasurement(MinecraftClient client) {
-        while (keybindRegistrar.copyMeasurement().wasPressed()) {
+    private void handleCopyMeasurement(Minecraft client) {
+        while (keybindRegistrar.copyMeasurement().consumeClick()) {
             MeasurePoint pointA = measurementService.selectionState().pointAOrNull();
             MeasurePoint pointB = measurementService.selectionState().pointBOrNull();
             if (pointA == null || pointB == null) {
@@ -184,31 +184,31 @@ public final class ClientInputHandler {
                 continue;
             }
 
-            client.keyboard.setClipboard(clipboardSummary(pointA, pointB, result));
+            client.keyboardHandler.setClipboard(clipboardSummary(pointA, pointB, result));
             sendActionBar(client, AxisRulerText.measurementCopied());
         }
     }
 
-    private boolean isAltDown(MinecraftClient client) {
-        return InputUtil.isKeyPressed(client.getWindow(), GLFW.GLFW_KEY_LEFT_ALT)
-                || InputUtil.isKeyPressed(client.getWindow(), GLFW.GLFW_KEY_RIGHT_ALT);
+    private boolean isAltDown(Minecraft client) {
+        return InputConstants.isKeyDown(client.getWindow(), GLFW.GLFW_KEY_LEFT_ALT)
+                || InputConstants.isKeyDown(client.getWindow(), GLFW.GLFW_KEY_RIGHT_ALT);
     }
 
-    private void sendActionBar(MinecraftClient client, Text message) {
+    private void sendActionBar(Minecraft client, Component message) {
         if (client.player != null) {
-            client.player.sendMessage(message, true);
+            client.player.sendOverlayMessage(message);
         }
     }
 
     private void consumeAllPendingKeyPresses() {
         keybindRegistrar.keyBindings().forEach(keyBinding -> {
-            while (keyBinding.wasPressed()) {
+            while (keyBinding.consumeClick()) {
             }
         });
     }
 
     private String clipboardSummary(MeasurePoint pointA, MeasurePoint pointB, MeasurementResult result) {
-        String mode = I18n.translate(measurementService.selectionState().mode().translationKey());
+        String mode = I18n.get(measurementService.selectionState().mode().translationKey());
         return String.join(
                 System.lineSeparator(),
                 "AxisRuler",

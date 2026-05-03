@@ -3,8 +3,8 @@ package com.axisruler.measure;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 public record MeasurementResult(
         boolean valid,
@@ -29,10 +29,10 @@ public record MeasurementResult(
         long volume,
         BlockPos minBlockPos,
         BlockPos maxBlockPos,
-        Vec3d center
+        Vec3 center
 ) {
-    private static final BlockPos ZERO_BLOCK_POS = BlockPos.ORIGIN;
-    private static final Vec3d ZERO_CENTER = new Vec3d(0.0, 0.0, 0.0);
+    private static final BlockPos ZERO_BLOCK_POS = new BlockPos(0, 0, 0);
+    private static final Vec3 ZERO_CENTER = new Vec3(0.0, 0.0, 0.0);
     private static final String EMPTY_WORLD_KEY = "";
 
     public MeasurementResult {
@@ -40,8 +40,8 @@ public record MeasurementResult(
         pointA = Objects.requireNonNull(pointA, "pointA");
         pointB = Objects.requireNonNull(pointB, "pointB");
         worldKey = Objects.requireNonNull(worldKey, "worldKey");
-        minBlockPos = Objects.requireNonNull(minBlockPos, "minBlockPos").toImmutable();
-        maxBlockPos = Objects.requireNonNull(maxBlockPos, "maxBlockPos").toImmutable();
+        minBlockPos = copy(Objects.requireNonNull(minBlockPos, "minBlockPos"));
+        maxBlockPos = copy(Objects.requireNonNull(maxBlockPos, "maxBlockPos"));
         center = Objects.requireNonNull(center, "center");
         if (valid && !invalidReason.isEmpty()) {
             throw new IllegalArgumentException("valid measurement must not have an invalid reason");
@@ -103,7 +103,7 @@ public record MeasurementResult(
             long volume,
             BlockPos minBlockPos,
             BlockPos maxBlockPos,
-            Vec3d center
+            Vec3 center
     ) {
         return new MeasurementResult(
                 true,
@@ -230,5 +230,9 @@ public record MeasurementResult(
                 Math.max(pointA.y(), pointB.y()),
                 Math.max(pointA.z(), pointB.z())
         );
+    }
+
+    private static BlockPos copy(BlockPos blockPos) {
+        return new BlockPos(blockPos.getX(), blockPos.getY(), blockPos.getZ());
     }
 }

@@ -1,8 +1,8 @@
 package com.axisruler.measure;
 
 import java.util.Objects;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 public final class MeasurementService {
     private final SelectionState selectionState;
@@ -49,7 +49,7 @@ public final class MeasurementService {
         long volume = multiply(sizeX, sizeY, sizeZ);
         BlockPos minBlockPos = minBlockPos(pointA, pointB);
         BlockPos maxBlockPos = maxBlockPos(pointA, pointB);
-        Vec3d center = inclusiveCenter(minBlockPos, sizeX, sizeY, sizeZ);
+        Vec3 center = inclusiveCenter(minBlockPos, sizeX, sizeY, sizeZ);
 
         return MeasurementResult.valid(
                 pointA,
@@ -131,8 +131,8 @@ public final class MeasurementService {
         );
     }
 
-    private static Vec3d inclusiveCenter(BlockPos minBlockPos, int sizeX, int sizeY, int sizeZ) {
-        return new Vec3d(
+    private static Vec3 inclusiveCenter(BlockPos minBlockPos, int sizeX, int sizeY, int sizeZ) {
+        return new Vec3(
                 minBlockPos.getX() + sizeX / 2.0D,
                 minBlockPos.getY() + sizeY / 2.0D,
                 minBlockPos.getZ() + sizeZ / 2.0D

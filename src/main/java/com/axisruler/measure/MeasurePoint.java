@@ -1,10 +1,10 @@
 package com.axisruler.measure;
 
 import java.util.Objects;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 public record MeasurePoint(String worldKey, BlockPos blockPos) {
     public MeasurePoint {
@@ -17,9 +17,9 @@ public record MeasurePoint(String worldKey, BlockPos blockPos) {
         return new MeasurePoint(worldKey, blockPos);
     }
 
-    public static MeasurePoint of(RegistryKey<World> worldKey, BlockPos blockPos) {
+    public static MeasurePoint of(ResourceKey<Level> worldKey, BlockPos blockPos) {
         Objects.requireNonNull(worldKey, "worldKey");
-        return new MeasurePoint(worldKey.getValue().toString(), blockPos);
+        return new MeasurePoint(worldKey.identifier().toString(), blockPos);
     }
 
     public int x() {
@@ -34,8 +34,8 @@ public record MeasurePoint(String worldKey, BlockPos blockPos) {
         return blockPos.getZ();
     }
 
-    public Vec3d blockCenter() {
-        return new Vec3d(x() + 0.5D, y() + 0.5D, z() + 0.5D);
+    public Vec3 blockCenter() {
+        return new Vec3(x() + 0.5D, y() + 0.5D, z() + 0.5D);
     }
 
     public String formatBlockPosition() {

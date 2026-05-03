@@ -11,21 +11,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.Text;
-import net.minecraft.text.OrderedText;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.renderer.RenderPipelines;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 
 public final class AxisRulerConfigScreen extends Screen {
     private static final int BACKGROUND = 0xE60C1016;
@@ -84,25 +85,25 @@ public final class AxisRulerConfigScreen extends Screen {
     private final ConfigManager configManager;
     private final SelectionState selectionState;
     private final MutableConfig state;
-    private final List<ClickableWidget> dynamicWidgets = new ArrayList<>();
-    private final List<ClickableWidget> fixedWidgets = new ArrayList<>();
+    private final List<AbstractWidget> dynamicWidgets = new ArrayList<>();
+    private final List<AbstractWidget> fixedWidgets = new ArrayList<>();
     private Tab activeTab = Tab.CORE;
     private ColorGroup activePaletteGroup = ColorGroup.OVERLAY;
     private ColorRole activeColorRole = ColorRole.POINT_A;
     private boolean committed;
     private ColorPickerWidget colorPicker;
-    private TextFieldWidget redField;
-    private TextFieldWidget greenField;
-    private TextFieldWidget blueField;
-    private TextFieldWidget hexField;
-    private TextFieldWidget customPresetField;
+    private EditBox redField;
+    private EditBox greenField;
+    private EditBox blueField;
+    private EditBox hexField;
+    private EditBox customPresetField;
     private boolean synchronizingFields;
     private int contentScrollOffset;
     private int maxContentScroll;
     private ContentLayout contentLayout;
 
     private AxisRulerConfigScreen(Screen parent, ConfigManager configManager, SelectionState selectionState, AxisRulerConfig config) {
-        super(Text.translatable("axisruler.config.title"));
+        super(Component.translatable("axisruler.config.title"));
         this.parent = parent;
         this.configManager = configManager;
         this.selectionState = selectionState;
@@ -130,12 +131,12 @@ public final class AxisRulerConfigScreen extends Screen {
             colorPicker.close();
             colorPicker = null;
         }
-        clearChildren();
+        clearWidgets();
         dynamicWidgets.clear();
         fixedWidgets.clear();
         contentLayout = contentLayout();
         maxContentScroll = Math.max(0, activeTabContentHeight(contentLayout) - contentLayout.viewportHeight());
-        contentScrollOffset = MathHelper.clamp(contentScrollOffset, 0, maxContentScroll);
+        contentScrollOffset = Mth.clamp(contentScrollOffset, 0, maxContentScroll);
 
         int tabGap = 10;
         int tabWidth = Math.max(84, (contentLayout.panelWidth() - tabGap * (Tab.values().length - 1)) / Tab.values().length);
@@ -150,8 +151,8 @@ public final class AxisRulerConfigScreen extends Screen {
             x += tabWidth + tabGap;
         }
 
-        addFixedControl(new AxisButtonWidget(width - 220, contentLayout.footerY(), 96, CONTROL_HEIGHT, Text.translatable("axisruler.config.action.done"), ButtonVariant.PRIMARY, this::saveAndClose));
-        addFixedControl(new AxisButtonWidget(width - 116, contentLayout.footerY(), 92, CONTROL_HEIGHT, Text.translatable("axisruler.config.action.cancel"), ButtonVariant.GHOST, this::close));
+        addFixedControl(new AxisButtonWidget(width - 220, contentLayout.footerY(), 96, CONTROL_HEIGHT, Component.translatable("axisruler.config.action.done"), ButtonVariant.PRIMARY, this::saveAndClose));
+        addFixedControl(new AxisButtonWidget(width - 116, contentLayout.footerY(), 92, CONTROL_HEIGHT, Component.translatable("axisruler.config.action.cancel"), ButtonVariant.GHOST, this::onClose));
 
         switch (activeTab) {
             case CORE -> buildCoreTab(contentLayout.panelX(), contentLayout.panelY(), contentLayout.panelWidth(), contentLayout.panelHeight());
@@ -292,13 +293,13 @@ public final class AxisRulerConfigScreen extends Screen {
         int actionY = layout.actionsY + 16;
         int actionWidth = (layout.actionsWidth - ROW_GAP * 2) / 3;
         addControl(actionButton(layout.actionsX, actionY, "axisruler.config.action.copy_hex", ButtonVariant.SECONDARY, () -> {
-            if (client != null) {
-                client.keyboard.setClipboard(ColorUtils.toHex(activeColor(), true));
+            if (minecraft != null) {
+                minecraft.keyboardHandler.setClipboard(ColorUtils.toHex(activeColor(), true));
             }
         }, "axisruler.config.action.copy_hex.desc", actionWidth));
         addControl(actionButton(layout.actionsX + actionWidth + ROW_GAP, actionY, "axisruler.config.action.paste_hex", ButtonVariant.SECONDARY, () -> {
-            if (client != null) {
-                setActiveHex(client.keyboard.getClipboard());
+            if (minecraft != null) {
+                setActiveHex(minecraft.keyboardHandler.getClipboard());
                 syncColorFields();
             }
         }, "axisruler.config.action.paste_hex.desc", actionWidth));
@@ -322,7 +323,7 @@ public final class AxisRulerConfigScreen extends Screen {
                 pushPreview();
                 rebuild();
             });
-            button.setTooltip(Tooltip.of(Text.translatable(preset.descriptionKey)));
+            button.setTooltip(Tooltip.create(Component.translatable(preset.descriptionKey)));
             addControl(button);
         }
 
@@ -332,7 +333,7 @@ public final class AxisRulerConfigScreen extends Screen {
                 state.customPresetName = trimmed;
             }
         });
-        customPresetField.setText(state.customPresetName);
+        customPresetField.setValue(state.customPresetName);
         addControl(customPresetField);
         addControl(actionButton(layout.saveButtonX(), layout.fieldY(), "axisruler.config.action.save_custom_preset", ButtonVariant.PRIMARY, () -> {
             state.saveAsCustomPreset();
@@ -346,13 +347,13 @@ public final class AxisRulerConfigScreen extends Screen {
         }, "axisruler.config.action.reset_all.desc", Math.min(186, layout.formWidth())));
     }
 
-    private ClickableWidget actionButton(int x, int y, String key, ButtonVariant variant, PressAction action, String descriptionKey, int width) {
-        AxisButtonWidget widget = new AxisButtonWidget(x, y, width, 20, Text.translatable(key), variant, action::onPress);
-        widget.setTooltip(Tooltip.of(Text.translatable(descriptionKey)));
+    private AbstractWidget actionButton(int x, int y, String key, ButtonVariant variant, PressAction action, String descriptionKey, int width) {
+        AxisButtonWidget widget = new AxisButtonWidget(x, y, width, 20, Component.translatable(key), variant, action::onPress);
+        widget.setTooltip(Tooltip.create(Component.translatable(descriptionKey)));
         return widget;
     }
 
-    private ClickableWidget toggleButton(
+    private AbstractWidget toggleButton(
             int x,
             int y,
             int width,
@@ -366,17 +367,17 @@ public final class AxisRulerConfigScreen extends Screen {
             pushPreview();
             rebuild();
         });
-        widget.setTooltip(Tooltip.of(Text.translatable(descriptionKey)));
+        widget.setTooltip(Tooltip.create(Component.translatable(descriptionKey)));
         return widget;
     }
 
-    private ClickableWidget cycleButton(int x, int y, int width, Text value, String descriptionKey, PressAction action) {
+    private AbstractWidget cycleButton(int x, int y, int width, Component value, String descriptionKey, PressAction action) {
         AxisButtonWidget widget = new AxisButtonWidget(x, y, width, 22, value, ButtonVariant.SECONDARY, action::onPress);
-        widget.setTooltip(Tooltip.of(Text.translatable(descriptionKey)));
+        widget.setTooltip(Tooltip.create(Component.translatable(descriptionKey)));
         return widget;
     }
 
-    private ClickableWidget floatSlider(
+    private AbstractWidget floatSlider(
             int x,
             int y,
             int width,
@@ -390,11 +391,11 @@ public final class AxisRulerConfigScreen extends Screen {
             setter.accept(value);
             pushPreview();
         });
-        slider.setTooltip(Tooltip.of(Text.translatable(descriptionKey)));
+        slider.setTooltip(Tooltip.create(Component.translatable(descriptionKey)));
         return slider;
     }
 
-    private ClickableWidget intSlider(
+    private AbstractWidget intSlider(
             int x,
             int y,
             int width,
@@ -408,47 +409,47 @@ public final class AxisRulerConfigScreen extends Screen {
             setter.accept(Math.round(value));
             pushPreview();
         });
-        slider.setTooltip(Tooltip.of(Text.translatable(descriptionKey)));
+        slider.setTooltip(Tooltip.create(Component.translatable(descriptionKey)));
         return slider;
     }
 
-    private TextFieldWidget channelField(int x, int y, int width, Consumer<String> changeHandler) {
+    private EditBox channelField(int x, int y, int width, Consumer<String> changeHandler) {
         return textField(x, y, width, changeHandler);
     }
 
-    private TextFieldWidget textField(int x, int y, int width, Consumer<String> changeHandler) {
-        TextFieldWidget field = new AxisTextFieldWidget(textRenderer, x, y, width, CONTROL_HEIGHT);
+    private EditBox textField(int x, int y, int width, Consumer<String> changeHandler) {
+        EditBox field = new AxisEditBox(font, x, y, width, CONTROL_HEIGHT);
         field.setMaxLength(32);
-        field.setDrawsBackground(false);
-        field.setEditableColor(TEXT_PRIMARY);
-        field.setUneditableColor(TEXT_DISABLED);
-        field.setChangedListener(changeHandler::accept);
+        field.setBordered(false);
+        field.setTextColor(TEXT_PRIMARY);
+        field.setTextColorUneditable(TEXT_DISABLED);
+        field.setResponder(changeHandler::accept);
         return field;
     }
 
-    private void addControl(ClickableWidget widget) {
+    private void addControl(AbstractWidget widget) {
         dynamicWidgets.add(widget);
-        addDrawableChild(widget);
+        addRenderableWidget(widget);
     }
 
-    private void addControl(TextFieldWidget field) {
+    private void addControl(EditBox field) {
         dynamicWidgets.add(field);
-        addDrawableChild(field);
+        addRenderableWidget(field);
     }
 
-    private void addFixedControl(ClickableWidget widget) {
+    private void addFixedControl(AbstractWidget widget) {
         fixedWidgets.add(widget);
-        addDrawableChild(widget);
+        addRenderableWidget(widget);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         drawStableBackground(context);
         ContentLayout layout = contentLayout != null ? contentLayout : contentLayout();
         drawPanel(context, layout.panelX(), layout.panelY(), layout.panelWidth(), layout.panelHeight(), PANEL);
         drawPanel(context, layout.panelX() + 1, layout.panelY() + 1, layout.panelWidth() - 2, CONTENT_HEADER_HEIGHT, PANEL_ALT);
-        context.drawTextWithShadow(textRenderer, title, layout.panelX() + 18, layout.panelY() + 14, TEXT_PRIMARY);
-        context.drawText(textRenderer, Text.translatable(activeTab.descriptionKey), layout.panelX() + 18, layout.panelY() + 30, TEXT_MUTED, false);
+        context.text(font, title, layout.panelX() + 18, layout.panelY() + 14, TEXT_PRIMARY, true);
+        context.text(font, Component.translatable(activeTab.descriptionKey), layout.panelX() + 18, layout.panelY() + 30, TEXT_MUTED, false);
 
         context.enableScissor(layout.viewportX(), layout.viewportY(), layout.viewportRight(), layout.viewportBottom());
 
@@ -461,13 +462,13 @@ public final class AxisRulerConfigScreen extends Screen {
             case STYLE_PRESETS -> renderPresetLabels(context, layout.panelX(), layout.panelY());
         }
 
-        for (ClickableWidget widget : dynamicWidgets) {
-            widget.render(context, mouseX, mouseY, delta);
+        for (AbstractWidget widget : dynamicWidgets) {
+            widget.extractRenderState(context, mouseX, mouseY, delta);
         }
         context.disableScissor();
 
-        for (ClickableWidget widget : fixedWidgets) {
-            widget.render(context, mouseX, mouseY, delta);
+        for (AbstractWidget widget : fixedWidgets) {
+            widget.extractRenderState(context, mouseX, mouseY, delta);
         }
     }
 
@@ -477,7 +478,7 @@ public final class AxisRulerConfigScreen extends Screen {
             return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
 
-        int nextOffset = MathHelper.clamp(contentScrollOffset - (int) Math.round(verticalAmount * 28.0D), 0, maxContentScroll);
+        int nextOffset = Mth.clamp(contentScrollOffset - (int) Math.round(verticalAmount * 28.0D), 0, maxContentScroll);
         if (nextOffset == contentScrollOffset) {
             return true;
         }
@@ -487,7 +488,7 @@ public final class AxisRulerConfigScreen extends Screen {
         return true;
     }
 
-    private void drawStableBackground(DrawContext context) {
+    private void drawStableBackground(GuiGraphicsExtractor context) {
         int midY = height / 2;
         context.fillGradient(0, 0, width, midY, 0xF010141A, BACKGROUND);
         context.fillGradient(0, midY, width, height, BACKGROUND, 0xF0080B10);
@@ -495,7 +496,7 @@ public final class AxisRulerConfigScreen extends Screen {
     }
 
     @Override
-    public void close() {
+    public void onClose() {
         if (colorPicker != null) {
             colorPicker.close();
             colorPicker = null;
@@ -503,14 +504,14 @@ public final class AxisRulerConfigScreen extends Screen {
         if (!committed && configManager != null) {
             configManager.discardPreview();
         }
-        if (client != null) {
-            client.setScreen(parent);
+        if (minecraft != null) {
+            minecraft.setScreen(parent);
         }
     }
 
     private void saveAndClose() {
         if (configManager == null) {
-            close();
+            onClose();
             return;
         }
         AxisRulerConfig updated = state.toConfig();
@@ -520,7 +521,7 @@ public final class AxisRulerConfigScreen extends Screen {
             selectionState.applyConfigDefaults(updated);
         }
         committed = true;
-        close();
+        onClose();
     }
 
     private void pushPreview() {
@@ -529,7 +530,7 @@ public final class AxisRulerConfigScreen extends Screen {
         }
     }
 
-    private void drawPanel(DrawContext context, int x, int y, int width, int height, int color) {
+    private void drawPanel(GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         context.fill(x, y, x + width, y + height, color);
         context.fill(x, y, x + width, y + 1, PANEL_BORDER);
         context.fill(x, y + height - 1, x + width, y + height, PANEL_BORDER);
@@ -537,13 +538,13 @@ public final class AxisRulerConfigScreen extends Screen {
         context.fill(x + width - 1, y, x + width, y + height, PANEL_BORDER);
     }
 
-    private void renderCoreLabels(DrawContext context, int x, int y) {
+    private void renderCoreLabels(GuiGraphicsExtractor context, int x, int y) {
         FormGrid grid = formGrid(x, y, width - 48);
         drawFormRow(context, grid, 0, "axisruler.config.option.enabled", "axisruler.config.option.enabled.desc");
         drawFormRow(context, grid, 1, "axisruler.config.option.two_points_only", "axisruler.config.option.two_points_only.desc");
     }
 
-    private void renderHudLabels(DrawContext context, int x, int y) {
+    private void renderHudLabels(GuiGraphicsExtractor context, int x, int y) {
         FormGrid grid = formGrid(x, y, width - 48);
         drawFormRow(context, grid, 0, "axisruler.config.option.hud_enabled", "axisruler.config.option.hud_enabled.desc");
         drawFormRow(context, grid, 1, "axisruler.config.option.hud_compact", "axisruler.config.option.hud_compact.desc");
@@ -557,7 +558,7 @@ public final class AxisRulerConfigScreen extends Screen {
         drawHudPreview(context, grid.rowX(), grid.rowY(9) + SECTION_GAP, grid.rowWidth(), hudPreviewHeight(contentLayout));
     }
 
-    private void renderOverlayLabels(DrawContext context, int x, int y) {
+    private void renderOverlayLabels(GuiGraphicsExtractor context, int x, int y) {
         FormGrid grid = formGrid(x, y, width - 48);
         drawFormRow(context, grid, 0, "axisruler.config.option.overlay_enabled", "axisruler.config.option.overlay_enabled.desc");
         drawFormRow(context, grid, 1, "axisruler.config.option.overlay_fill", "axisruler.config.option.overlay_fill.desc");
@@ -570,7 +571,7 @@ public final class AxisRulerConfigScreen extends Screen {
         drawFormRow(context, grid, 8, "axisruler.config.option.overlay_tick_size", "axisruler.config.option.overlay_tick_size.desc");
     }
 
-    private void renderLabelLabels(DrawContext context, int x, int y) {
+    private void renderLabelLabels(GuiGraphicsExtractor context, int x, int y) {
         FormGrid grid = formGrid(x, y, width - 48);
         drawFormRow(context, grid, 0, "axisruler.config.option.labels_enabled", "axisruler.config.option.labels_enabled.desc");
         drawFormRow(context, grid, 1, "axisruler.config.option.label_background", "axisruler.config.option.label_background.desc");
@@ -582,7 +583,7 @@ public final class AxisRulerConfigScreen extends Screen {
         drawFormRow(context, grid, 7, "axisruler.config.option.line_alpha", "axisruler.config.option.line_alpha.desc");
     }
 
-    private void renderPaletteLabels(DrawContext context, int x, int y) {
+    private void renderPaletteLabels(GuiGraphicsExtractor context, int x, int y) {
         PaletteLayout layout = paletteLayout(x, y, width - 48, height - 110);
         drawPanel(context, layout.listX, layout.listY, layout.listWidth, layout.listHeight, PANEL_SUBTLE);
         drawPanel(context, layout.centerX, layout.centerY, layout.centerWidth, layout.centerHeight, PANEL_SUBTLE);
@@ -605,7 +606,7 @@ public final class AxisRulerConfigScreen extends Screen {
             context.fill(previewX + 1, previewY + 1, previewX + previewWidth - 1, previewY + previewBlockHeight() - 1, activeColor());
             drawCenteredTextInRect(
                     context,
-                    Text.literal(ColorUtils.toHex(activeColor(), true)),
+                    Component.literal(ColorUtils.toHex(activeColor(), true)),
                     previewX + PREVIEW_TEXT_HORIZONTAL_PADDING,
                     previewY,
                     previewWidth - PREVIEW_TEXT_HORIZONTAL_PADDING * 2,
@@ -625,7 +626,7 @@ public final class AxisRulerConfigScreen extends Screen {
         drawFieldLabel(context, layout.rightX + 14, cursorY, "HEX");
     }
 
-    private void renderPresetLabels(DrawContext context, int x, int y) {
+    private void renderPresetLabels(GuiGraphicsExtractor context, int x, int y) {
         PresetLayout layout = presetLayout(x, y, width - 48, height - 110);
         drawSectionHeader(
                 context,
@@ -635,64 +636,65 @@ public final class AxisRulerConfigScreen extends Screen {
                 "axisruler.config.presets.desc",
                 layout.contentWidth()
         );
-        context.drawTextWithShadow(
-                textRenderer,
-                Text.translatable("axisruler.config.presets.custom_name"),
+        context.text(
+                font,
+                Component.translatable("axisruler.config.presets.custom_name"),
                 layout.formX(),
                 layout.labelY(),
-                TEXT_PRIMARY
+                TEXT_PRIMARY,
+                true
         );
     }
 
-    private void drawFormRow(DrawContext context, FormGrid grid, int row, String titleKey, String descriptionKey) {
+    private void drawFormRow(GuiGraphicsExtractor context, FormGrid grid, int row, String titleKey, String descriptionKey) {
         int rowY = grid.rowY(row);
         int rowBottom = rowY + ROW_HEIGHT - 6;
         context.fill(grid.rowX(), rowY - 6, grid.rowX() + grid.rowWidth(), rowBottom, row % 2 == 0 ? ROW_BACKGROUND : ROW_BACKGROUND_HOVER);
-        drawPaddedLabelText(context, Text.translatable(titleKey), grid.labelX(), rowY + ROW_LABEL_TOP_PADDING, grid.labelWidth(), TEXT_PRIMARY, true);
-        drawWrappedText(context, Text.translatable(descriptionKey), grid.labelX(), rowY + ROW_LABEL_TOP_PADDING + textRenderer.fontHeight + LABEL_TO_DESCRIPTION_GAP, grid.labelWidth(), TEXT_SECONDARY);
+        drawPaddedLabelText(context, Component.translatable(titleKey), grid.labelX(), rowY + ROW_LABEL_TOP_PADDING, grid.labelWidth(), TEXT_PRIMARY, true);
+        drawWrappedText(context, Component.translatable(descriptionKey), grid.labelX(), rowY + ROW_LABEL_TOP_PADDING + font.lineHeight + LABEL_TO_DESCRIPTION_GAP, grid.labelWidth(), TEXT_SECONDARY);
     }
 
-    private void drawSectionHeader(DrawContext context, int x, int y, String titleKey, String descriptionKey, int width) {
-        drawPaddedLabelText(context, Text.translatable(titleKey), x, y, width, TEXT_PRIMARY, true);
-        drawWrappedText(context, Text.translatable(descriptionKey), x, y + textRenderer.fontHeight + LABEL_TO_DESCRIPTION_GAP, width, TEXT_SECONDARY);
+    private void drawSectionHeader(GuiGraphicsExtractor context, int x, int y, String titleKey, String descriptionKey, int width) {
+        drawPaddedLabelText(context, Component.translatable(titleKey), x, y, width, TEXT_PRIMARY, true);
+        drawWrappedText(context, Component.translatable(descriptionKey), x, y + font.lineHeight + LABEL_TO_DESCRIPTION_GAP, width, TEXT_SECONDARY);
     }
 
-    private void drawWrappedText(DrawContext context, Text text, int x, int y, int width, int color) {
+    private void drawWrappedText(GuiGraphicsExtractor context, Component text, int x, int y, int width, int color) {
         int drawY = y;
-        for (OrderedText line : textRenderer.wrapLines(text, Math.max(10, width))) {
-            context.drawText(textRenderer, line, x, drawY, color, false);
+        for (FormattedCharSequence line : font.split(text, Math.max(10, width))) {
+            context.text(font, line, x, drawY, color, false);
             drawY += TEXT_LINE_HEIGHT;
         }
     }
 
-    private void drawFieldLabel(DrawContext context, int x, int y, String value) {
-        drawPaddedLabelText(context, Text.literal(value), x, y, 28, TEXT_MUTED, false);
+    private void drawFieldLabel(GuiGraphicsExtractor context, int x, int y, String value) {
+        drawPaddedLabelText(context, Component.literal(value), x, y, 28, TEXT_MUTED, false);
     }
 
-    private void drawPaddedLabelText(DrawContext context, Text text, int x, int y, int width, int color, boolean shadow) {
-        Text trimmed = textRenderer.getWidth(text) > width
-                ? Text.literal(textRenderer.trimToWidth(text.getString(), Math.max(0, width - 6)))
+    private void drawPaddedLabelText(GuiGraphicsExtractor context, Component text, int x, int y, int width, int color, boolean shadow) {
+        Component trimmed = font.width(text) > width
+                ? Component.literal(font.plainSubstrByWidth(text.getString(), Math.max(0, width - 6)))
                 : text;
         if (shadow) {
-            context.drawTextWithShadow(textRenderer, trimmed, x, y, color);
+            context.text(font, trimmed, x, y, color, true);
             return;
         }
-        context.drawText(textRenderer, trimmed, x, y, color, false);
+        context.text(font, trimmed, x, y, color, false);
     }
 
-    private void drawCenteredTextInRect(DrawContext context, Text text, int x, int y, int width, int height, int color, boolean shadow) {
-        int textWidth = textRenderer.getWidth(text);
+    private void drawCenteredTextInRect(GuiGraphicsExtractor context, Component text, int x, int y, int width, int height, int color, boolean shadow) {
+        int textWidth = font.width(text);
         int textX = x + Math.max(0, (width - textWidth) / 2);
-        int textY = centeredTextY(textRenderer, y, height);
+        int textY = centeredTextY(font, y, height);
         if (shadow) {
-            context.drawTextWithShadow(textRenderer, text, textX, textY, color);
+            context.text(font, text, textX, textY, color, true);
             return;
         }
-        context.drawText(textRenderer, text, textX, textY, color, false);
+        context.text(font, text, textX, textY, color, false);
     }
 
-    private static int centeredTextY(net.minecraft.client.font.TextRenderer textRenderer, int y, int height) {
-        return y + Math.max(0, (height - textRenderer.fontHeight) / 2) + FONT_VISUAL_NUDGE;
+    private static int centeredTextY(Font textRenderer, int y, int height) {
+        return y + Math.max(0, (height - textRenderer.lineHeight) / 2) + FONT_VISUAL_NUDGE;
     }
 
     private static int contrastingTextColor(int color) {
@@ -703,47 +705,47 @@ public final class AxisRulerConfigScreen extends Screen {
         return luminance >= 148 ? 0xFF0A0E13 : TEXT_PRIMARY;
     }
 
-    private void drawPaletteGroups(DrawContext context, PaletteLayout layout) {
+    private void drawPaletteGroups(GuiGraphicsExtractor context, PaletteLayout layout) {
         int chipY = paletteGroupY(layout);
         int listTitleY = chipY + 20 + BLOCK_GAP;
-        context.drawTextWithShadow(textRenderer, Text.translatable(activePaletteGroup.titleKey), layout.listX + 14, listTitleY, TEXT_MUTED);
+        context.text(font, Component.translatable(activePaletteGroup.titleKey), layout.listX + 14, listTitleY, TEXT_MUTED, true);
     }
 
-    private void drawHudPreview(DrawContext context, int x, int y, int width, int height) {
+    private void drawHudPreview(GuiGraphicsExtractor context, int x, int y, int width, int height) {
         if (contentLayout == null) {
             return;
         }
-        int clampedY = MathHelper.clamp(y, contentLayout.viewportY(), Math.max(contentLayout.viewportY(), contentLayout.viewportBottom() - height));
+        int clampedY = Mth.clamp(y, contentLayout.viewportY(), Math.max(contentLayout.viewportY(), contentLayout.viewportBottom() - height));
         int clampedHeight = Math.max(HUD_PREVIEW_MIN_HEIGHT, Math.min(height, contentLayout.viewportBottom() - clampedY));
         drawPanel(context, x, clampedY, width, clampedHeight, PANEL_SUBTLE);
-        context.drawTextWithShadow(textRenderer, Text.translatable("axisruler.config.hud_preview.title"), x + 14, clampedY + 12, TEXT_PRIMARY);
-        context.drawText(textRenderer, Text.translatable("axisruler.config.hud_preview.desc"), x + 14, clampedY + 24, TEXT_SECONDARY, false);
+        context.text(font, Component.translatable("axisruler.config.hud_preview.title"), x + 14, clampedY + 12, TEXT_PRIMARY, true);
+        context.text(font, Component.translatable("axisruler.config.hud_preview.desc"), x + 14, clampedY + 24, TEXT_SECONDARY, false);
         drawHudPreviewPanel(context, x + 14, clampedY + 40, Math.min(250, width - 28), clampedHeight - 54);
     }
 
-    private void drawHudPreviewPanel(DrawContext context, int x, int y, int width, int height) {
+    private void drawHudPreviewPanel(GuiGraphicsExtractor context, int x, int y, int width, int height) {
         int panelWidth = Math.max(160, width);
         int panelHeight = Math.max(44, height);
         context.fill(x, y, x + panelWidth, y + panelHeight, state.effectiveHudBackgroundColor());
         context.fill(x, y, x + 2, y + panelHeight, state.effectiveHudAccentColor());
-        context.drawStrokedRectangle(x, y, panelWidth, panelHeight, state.effectiveHudBorderColor());
+        context.outline(x, y, panelWidth, panelHeight, state.effectiveHudBorderColor());
         int titleY = y + 6;
-        drawPreviewText(context, Text.translatable("axisruler.hud.title"), x + 8, titleY, state.hudTitleColor);
+        drawPreviewText(context, Component.translatable("axisruler.hud.title"), x + 8, titleY, state.hudTitleColor);
         int separatorY = y + 16;
         context.fill(x + 8, separatorY, x + panelWidth - 8, separatorY + 1, state.effectiveHudAccentColor());
         int rowY = y + 22;
-        drawPreviewText(context, Text.translatable("axisruler.hud.label.size"), x + 8, rowY, state.hudSecondaryTextColor);
-        drawPreviewText(context, Text.literal("48 x 16 x 32"), x + 58, rowY, state.hudPrimaryTextColor);
-        drawPreviewText(context, Text.translatable("axisruler.hud.label.warn"), x + 8, rowY + 10, state.hudSecondaryTextColor);
-        drawPreviewText(context, Text.translatable("axisruler.hud.warning.different_worlds"), x + 58, rowY + 10, state.hudWarningColor);
+        drawPreviewText(context, Component.translatable("axisruler.hud.label.size"), x + 8, rowY, state.hudSecondaryTextColor);
+        drawPreviewText(context, Component.literal("48 x 16 x 32"), x + 58, rowY, state.hudPrimaryTextColor);
+        drawPreviewText(context, Component.translatable("axisruler.hud.label.warn"), x + 8, rowY + 10, state.hudSecondaryTextColor);
+        drawPreviewText(context, Component.translatable("axisruler.hud.warning.different_worlds"), x + 58, rowY + 10, state.hudWarningColor);
     }
 
-    private void drawPreviewText(DrawContext context, Text text, int x, int y, int color) {
+    private void drawPreviewText(GuiGraphicsExtractor context, Component text, int x, int y, int color) {
         if (state.hudTextShadow) {
-            context.drawTextWithShadow(textRenderer, text, x, y, color);
+            context.text(font, text, x, y, color, true);
             return;
         }
-        context.drawText(textRenderer, text, x, y, color, false);
+        context.text(font, text, x, y, color, false);
     }
 
     private int paletteRightContentY(PaletteLayout layout) {
@@ -783,15 +785,15 @@ public final class AxisRulerConfigScreen extends Screen {
     }
 
     private int presetsHeaderHeight(int contentWidth) {
-        return 14 + wrappedTextHeight(Text.translatable("axisruler.config.presets.desc"), contentWidth);
+        return 14 + wrappedTextHeight(Component.translatable("axisruler.config.presets.desc"), contentWidth);
     }
 
     private int sectionHeaderHeight(String titleKey, String descriptionKey, int width) {
-        return 14 + wrappedTextHeight(Text.translatable(descriptionKey), width);
+        return 14 + wrappedTextHeight(Component.translatable(descriptionKey), width);
     }
 
-    private int wrappedTextHeight(Text text, int width) {
-        return Math.max(TEXT_LINE_HEIGHT, textRenderer.wrapLines(text, Math.max(10, width)).size() * TEXT_LINE_HEIGHT);
+    private int wrappedTextHeight(Component text, int width) {
+        return Math.max(TEXT_LINE_HEIGHT, font.split(text, Math.max(10, width)).size() * TEXT_LINE_HEIGHT);
     }
 
     private int previewBlockHeight() {
@@ -811,7 +813,7 @@ public final class AxisRulerConfigScreen extends Screen {
         int contentX = x + PANEL_PADDING;
         int bodyY = y + HEADER_HEIGHT + PANEL_PADDING - contentScrollOffset;
         int availableWidth = width - PANEL_PADDING * 2;
-        int controlWidth = MathHelper.clamp(availableWidth / 3, 170, 260);
+        int controlWidth = Mth.clamp(availableWidth / 3, 170, 260);
         int labelWidth = availableWidth - controlWidth - LABEL_GAP;
         return new FormGrid(contentX, bodyY, labelWidth, controlWidth, availableWidth);
     }
@@ -826,9 +828,9 @@ public final class AxisRulerConfigScreen extends Screen {
         int rows = (StylePreset.values().length + columns - 1) / columns;
         int gridY = headerY + headerHeight + SECTION_GAP;
         int labelY = gridY + rows * PRESET_CARD_HEIGHT + Math.max(0, rows - 1) * ROW_GAP + SECTION_GAP;
-        int fieldY = labelY + textRenderer.fontHeight + LABEL_TO_FIELD_GAP;
+        int fieldY = labelY + font.lineHeight + LABEL_TO_FIELD_GAP;
         int formWidth = contentWidth;
-        int saveButtonWidth = MathHelper.clamp(formWidth / 3, 148, 210);
+        int saveButtonWidth = Mth.clamp(formWidth / 3, 148, 210);
         int fieldWidth = Math.max(140, formWidth - saveButtonWidth - BLOCK_GAP);
         int resetY = fieldY + CONTROL_HEIGHT + SECTION_GAP;
         return new PresetLayout(contentX, contentWidth, headerY, gridY, columns, cardWidth, labelY, fieldY, formWidth, fieldWidth, resetY);
@@ -841,8 +843,8 @@ public final class AxisRulerConfigScreen extends Screen {
         int actionsHeight = 52;
         int topHeight = Math.max(228, height - HEADER_HEIGHT - PANEL_PADDING * 2 - actionsHeight - 14);
         int gap = 14;
-        int listWidth = MathHelper.clamp(contentWidth / 4, 170, 210);
-        int rightWidth = MathHelper.clamp(contentWidth / 4, 180, 220);
+        int listWidth = Mth.clamp(contentWidth / 4, 170, 210);
+        int rightWidth = Mth.clamp(contentWidth / 4, 180, 220);
         int centerWidth = contentWidth - listWidth - rightWidth - gap * 2;
         if (centerWidth < 260) {
             int shortage = 260 - centerWidth;
@@ -880,7 +882,7 @@ public final class AxisRulerConfigScreen extends Screen {
     }
 
     private int hudPreviewHeight(ContentLayout layout) {
-        return MathHelper.clamp(layout.viewportHeight() / 4, HUD_PREVIEW_MIN_HEIGHT, HUD_PREVIEW_MAX_HEIGHT);
+        return Mth.clamp(layout.viewportHeight() / 4, HUD_PREVIEW_MIN_HEIGHT, HUD_PREVIEW_MAX_HEIGHT);
     }
 
     private void updateScrollableWidgetVisibility() {
@@ -889,7 +891,7 @@ public final class AxisRulerConfigScreen extends Screen {
         }
         int viewportTop = contentLayout.viewportY();
         int viewportBottom = contentLayout.viewportBottom();
-        for (ClickableWidget widget : dynamicWidgets) {
+        for (AbstractWidget widget : dynamicWidgets) {
             boolean visible = widget.getY() + widget.getHeight() >= viewportTop && widget.getY() <= viewportBottom;
             widget.visible = visible;
         }
@@ -955,10 +957,10 @@ public final class AxisRulerConfigScreen extends Screen {
         }
         synchronizingFields = true;
         int color = activeColor();
-        redField.setText(Integer.toString(ColorUtils.red(color)));
-        greenField.setText(Integer.toString(ColorUtils.green(color)));
-        blueField.setText(Integer.toString(ColorUtils.blue(color)));
-        hexField.setText(ColorUtils.toHex(color, true));
+        redField.setValue(Integer.toString(ColorUtils.red(color)));
+        greenField.setValue(Integer.toString(ColorUtils.green(color)));
+        blueField.setValue(Integer.toString(ColorUtils.blue(color)));
+        hexField.setValue(ColorUtils.toHex(color, true));
         synchronizingFields = false;
     }
 
@@ -975,7 +977,7 @@ public final class AxisRulerConfigScreen extends Screen {
     }
 
     private int parseInt(String value) {
-        return MathHelper.clamp(Integer.parseInt(value), 0, 255);
+        return Mth.clamp(Integer.parseInt(value), 0, 255);
     }
 
     @FunctionalInterface
@@ -1741,20 +1743,20 @@ public final class AxisRulerConfigScreen extends Screen {
         }
     }
 
-    private static class AxisButtonWidget extends ClickableWidget {
+    private static class AxisButtonWidget extends AbstractWidget {
         private final ButtonVariant variant;
         private final Runnable action;
         private float hoverProgress;
         private int pressedTicks;
 
-        private AxisButtonWidget(int x, int y, int width, int height, Text label, ButtonVariant variant, Runnable action) {
+        private AxisButtonWidget(int x, int y, int width, int height, Component label, ButtonVariant variant, Runnable action) {
             super(x, y, width, height, label);
             this.variant = variant;
             this.action = action;
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             if (!active) {
                 return;
             }
@@ -1763,7 +1765,7 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             float targetHover = active && isHovered() ? 1.0F : 0.0F;
             hoverProgress += (targetHover - hoverProgress) * 0.35F;
             if (pressedTicks > 0) {
@@ -1796,17 +1798,17 @@ public final class AxisRulerConfigScreen extends Screen {
             renderContent(context, textColor, pressed);
         }
 
-        protected void renderContent(DrawContext context, int textColor, boolean pressed) {
-            net.minecraft.client.font.TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+        protected void renderContent(GuiGraphicsExtractor context, int textColor, boolean pressed) {
+            Font textRenderer = Minecraft.getInstance().font;
             int insetY = pressed ? 1 : 0;
             int textY = centeredTextY(textRenderer, getY() + insetY, height);
-            int textWidth = textRenderer.getWidth(getMessage());
+            int textWidth = textRenderer.width(getMessage());
             int textX = getX() + Math.max(0, (width - textWidth) / 2);
-            context.drawTextWithShadow(textRenderer, getMessage(), textX, textY, textColor);
+            context.text(textRenderer, getMessage(), textX, textY, textColor, true);
         }
 
         private static int blend(int from, int to, float progress) {
-            float clamped = MathHelper.clamp(progress, 0.0F, 1.0F);
+            float clamped = Mth.clamp(progress, 0.0F, 1.0F);
             int a = Math.round(((from >>> 24) & 0xFF) + (((to >>> 24) & 0xFF) - ((from >>> 24) & 0xFF)) * clamped);
             int r = Math.round(((from >>> 16) & 0xFF) + (((to >>> 16) & 0xFF) - ((from >>> 16) & 0xFF)) * clamped);
             int g = Math.round(((from >>> 8) & 0xFF) + (((to >>> 8) & 0xFF) - ((from >>> 8) & 0xFF)) * clamped);
@@ -1819,7 +1821,7 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         @Override
-        protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {
         }
     }
 
@@ -1827,12 +1829,12 @@ public final class AxisRulerConfigScreen extends Screen {
         private final boolean activeTab;
 
         private TabButtonWidget(int x, int y, int width, int height, Tab tab, boolean active, PressAction action) {
-            super(x, y, width, height, Text.translatable(tab.titleKey), ButtonVariant.TAB, action::onPress);
+            super(x, y, width, height, Component.translatable(tab.titleKey), ButtonVariant.TAB, action::onPress);
             this.activeTab = active;
         }
 
         @Override
-        protected void renderContent(DrawContext context, int textColor, boolean pressed) {
+        protected void renderContent(GuiGraphicsExtractor context, int textColor, boolean pressed) {
             super.renderContent(context, activeTab ? TEXT_PRIMARY : textColor, pressed);
             if (activeTab) {
                 context.fill(getX() + 1, getY() + height - 2, getX() + width - 1, getY() + height, PANEL_ACCENT);
@@ -1845,23 +1847,23 @@ public final class AxisRulerConfigScreen extends Screen {
         private final boolean selected;
 
         private PresetButtonWidget(int x, int y, int width, int height, StylePreset preset, boolean selected, PressAction action) {
-            super(x, y, width, height, Text.translatable(preset.translationKey), selected ? ButtonVariant.TAB : ButtonVariant.SUBTLE, action::onPress);
+            super(x, y, width, height, Component.translatable(preset.translationKey), selected ? ButtonVariant.TAB : ButtonVariant.SUBTLE, action::onPress);
             this.preset = preset;
             this.selected = selected;
         }
 
         @Override
-        protected void renderContent(DrawContext context, int textColor, boolean pressed) {
+        protected void renderContent(GuiGraphicsExtractor context, int textColor, boolean pressed) {
             int insetY = pressed ? 1 : 0;
             int textX = getX() + 10;
-            net.minecraft.client.font.TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+            Font textRenderer = Minecraft.getInstance().font;
             int titleY = getY() + 6 + insetY;
-            int descY = titleY + textRenderer.fontHeight + 4;
-            Text title = Text.literal(textRenderer.trimToWidth(Text.translatable(preset.translationKey).getString(), Math.max(0, width - 20)));
-            context.drawText(textRenderer, title, textX, titleY, selected ? TEXT_PRIMARY : textColor, false);
-            context.drawText(
+            int descY = titleY + textRenderer.lineHeight + 4;
+            Component title = Component.literal(textRenderer.plainSubstrByWidth(Component.translatable(preset.translationKey).getString(), Math.max(0, width - 20)));
+            context.text(textRenderer, title, textX, titleY, selected ? TEXT_PRIMARY : textColor, false);
+            context.text(
                     textRenderer,
-                    Text.translatable(selected ? "axisruler.config.preset.status.active" : "axisruler.config.preset.status.apply"),
+                    Component.translatable(selected ? "axisruler.config.preset.status.active" : "axisruler.config.preset.status.apply"),
                     textX,
                     descY,
                     selected ? PANEL_ACCENT : TEXT_MUTED,
@@ -1877,12 +1879,12 @@ public final class AxisRulerConfigScreen extends Screen {
         private final Consumer<PaletteGroupButtonWidget> action;
 
         private PaletteGroupButtonWidget(int x, int y, int width, int height, ColorGroup group, boolean active, Consumer<PaletteGroupButtonWidget> action) {
-            super(x, y, width, height, Text.translatable(group.titleKey), active ? ButtonVariant.TAB : ButtonVariant.SUBTLE, () -> { });
+            super(x, y, width, height, Component.translatable(group.titleKey), active ? ButtonVariant.TAB : ButtonVariant.SUBTLE, () -> { });
             this.action = action;
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             if (!active) {
                 return;
             }
@@ -1890,24 +1892,24 @@ public final class AxisRulerConfigScreen extends Screen {
         }
     }
 
-    private static final class ToggleWidget extends ClickableWidget {
+    private static final class ToggleWidget extends AbstractWidget {
         private boolean enabled;
         private final PressAction action;
 
         private ToggleWidget(int x, int y, int width, int height, boolean active, PressAction action) {
-            super(x, y, width, height, Text.empty());
+            super(x, y, width, height, Component.empty());
             this.enabled = active;
             this.action = action;
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             enabled = !enabled;
             action.onPress();
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             int pillColor = enabled ? 0xFF2EAA82 : 0xFF3A4453;
             int border = isHovered() ? 0xFF8AD8FF : 0x80415062;
             context.fill(getX(), getY(), getX() + width, getY() + height, CONTROL_BACKGROUND);
@@ -1920,26 +1922,25 @@ public final class AxisRulerConfigScreen extends Screen {
             int pillX = getX() + width - 56;
             int pillWidth = 46;
             context.fill(pillX, pillY, pillX + pillWidth, pillY + pillHeight, pillColor);
-            net.minecraft.client.font.TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-            Text toggleText = enabled ? ScreenTexts.ON : ScreenTexts.OFF;
-            int textX = pillX + Math.max(0, (pillWidth - textRenderer.getWidth(toggleText)) / 2);
+            Font textRenderer = Minecraft.getInstance().font;
+            Component toggleText = enabled ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF;
+            int textX = pillX + Math.max(0, (pillWidth - textRenderer.width(toggleText)) / 2);
             int textY = centeredTextY(textRenderer, pillY, pillHeight);
-            context.drawTextWithShadow(textRenderer, toggleText, textX, textY, TEXT_PRIMARY);
+            context.text(textRenderer, toggleText, textX, textY, TEXT_PRIMARY, true);
         }
 
         @Override
-        protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {
         }
     }
 
-    private static final class AxisTextFieldWidget extends TextFieldWidget {
-        private AxisTextFieldWidget(net.minecraft.client.font.TextRenderer textRenderer, int x, int y, int width, int height) {
-            super(textRenderer, x, y, width, height, Text.empty());
-            setTextPredicate(value -> value.length() <= 32);
+    private static final class AxisEditBox extends EditBox {
+        private AxisEditBox(Font textRenderer, int x, int y, int width, int height) {
+            super(textRenderer, x, y, width, height, Component.empty());
         }
 
         @Override
-        public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+        public void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             int border = !active
                     ? FIELD_BORDER_DISABLED
                     : isFocused()
@@ -1954,12 +1955,12 @@ public final class AxisRulerConfigScreen extends Screen {
             context.fill(getX() + getWidth() - 1, getY(), getX() + getWidth(), getY() + getHeight(), border);
             int originalX = getX();
             setX(originalX + FIELD_HORIZONTAL_PADDING);
-            super.renderWidget(context, mouseX, mouseY, delta);
+            super.extractWidgetRenderState(context, mouseX, mouseY, delta);
             setX(originalX);
         }
     }
 
-    private static final class SliderWidget extends ClickableWidget {
+    private static final class SliderWidget extends AbstractWidget {
         private final float min;
         private final float max;
         private final Consumer<Float> setter;
@@ -1967,40 +1968,40 @@ public final class AxisRulerConfigScreen extends Screen {
         private boolean dragging;
 
         private SliderWidget(int x, int y, int width, int height, float min, float max, float current, Consumer<Float> setter) {
-            super(x, y, width, height, Text.empty());
+            super(x, y, width, height, Component.empty());
             this.min = min;
             this.max = max;
             this.setter = setter;
-            this.value = MathHelper.clamp(current, min, max);
+            this.value = Mth.clamp(current, min, max);
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             dragging = true;
             updateFromMouse(click.x());
         }
 
         @Override
-        protected void onDrag(Click click, double deltaX, double deltaY) {
+        protected void onDrag(MouseButtonEvent click, double deltaX, double deltaY) {
             if (dragging) {
                 updateFromMouse(click.x());
             }
         }
 
         @Override
-        public void onRelease(Click click) {
+        public void onRelease(MouseButtonEvent click) {
             dragging = false;
         }
 
         private void updateFromMouse(double mouseX) {
-            float progress = MathHelper.clamp((float) ((mouseX - (getX() + 8)) / (width - 16.0D)), 0.0F, 1.0F);
+            float progress = Mth.clamp((float) ((mouseX - (getX() + 8)) / (width - 16.0D)), 0.0F, 1.0F);
             value = min + progress * (max - min);
             setter.accept(value);
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-            net.minecraft.client.font.TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+            Font textRenderer = Minecraft.getInstance().font;
             int border = isHovered() ? FIELD_BORDER_ACTIVE : FIELD_BORDER;
             context.fill(getX(), getY(), getX() + width, getY() + height, CONTROL_BACKGROUND);
             context.fill(getX(), getY(), getX() + width, getY() + 1, border);
@@ -2020,12 +2021,12 @@ public final class AxisRulerConfigScreen extends Screen {
             } else {
                 number = String.format(Locale.ROOT, "%.2f", value);
             }
-            int textWidth = textRenderer.getWidth(number);
-            context.drawText(textRenderer, Text.literal(number), getX() + width - textWidth - FIELD_HORIZONTAL_PADDING, centeredTextY(textRenderer, getY(), height), TEXT_PRIMARY, false);
+            int textWidth = textRenderer.width(number);
+            context.text(textRenderer, Component.literal(number), getX() + width - textWidth - FIELD_HORIZONTAL_PADDING, centeredTextY(textRenderer, getY(), height), TEXT_PRIMARY, false);
         }
 
         @Override
-        protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {
         }
     }
 
@@ -2035,14 +2036,14 @@ public final class AxisRulerConfigScreen extends Screen {
         private final Consumer<ColorRoleButtonWidget> action;
 
         private ColorRoleButtonWidget(int x, int y, int width, int height, ColorRole role, boolean active, int previewColor, Consumer<ColorRoleButtonWidget> action) {
-            super(x, y, width, height, Text.translatable(role.labelKey), active ? ButtonVariant.TAB : ButtonVariant.SECONDARY, () -> { });
+            super(x, y, width, height, Component.translatable(role.labelKey), active ? ButtonVariant.TAB : ButtonVariant.SECONDARY, () -> { });
             this.previewColor = previewColor;
             this.selected = active;
             this.action = action;
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             if (!active) {
                 return;
             }
@@ -2050,34 +2051,34 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         @Override
-        protected void renderContent(DrawContext context, int textColor, boolean pressed) {
+        protected void renderContent(GuiGraphicsExtractor context, int textColor, boolean pressed) {
             int insetY = pressed ? 1 : 0;
             context.fill(getX() + 8, getY() + 5 + insetY, getX() + 24, getY() + height - 5 + insetY, previewColor);
-            net.minecraft.client.font.TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-            Text trimmed = Text.literal(textRenderer.trimToWidth(getMessage().getString(), Math.max(0, width - 40)));
-            context.drawText(textRenderer, trimmed, getX() + 32, centeredTextY(textRenderer, getY() + insetY, height), selected ? TEXT_PRIMARY : textColor, false);
+            Font textRenderer = Minecraft.getInstance().font;
+            Component trimmed = Component.literal(textRenderer.plainSubstrByWidth(getMessage().getString(), Math.max(0, width - 40)));
+            context.text(textRenderer, trimmed, getX() + 32, centeredTextY(textRenderer, getY() + insetY, height), selected ? TEXT_PRIMARY : textColor, false);
         }
     }
 
-    private static final class SwatchButtonWidget extends ClickableWidget {
+    private static final class SwatchButtonWidget extends AbstractWidget {
         private final int color;
         private final boolean selected;
         private final Consumer<SwatchButtonWidget> action;
 
         private SwatchButtonWidget(int x, int y, int width, int height, int color, boolean selected, Consumer<SwatchButtonWidget> action) {
-            super(x, y, width, height, Text.empty());
+            super(x, y, width, height, Component.empty());
             this.color = color;
             this.selected = selected;
             this.action = action;
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             action.accept(this);
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             int inset = selected ? 0 : 1;
             int border = selected ? PANEL_ACCENT : isHovered() ? FIELD_BORDER_ACTIVE : 0x801A222D;
             if (selected) {
@@ -2091,19 +2092,19 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         @Override
-        protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {
         }
     }
 
-    private static final class ColorPickerWidget extends ClickableWidget {
+    private static final class ColorPickerWidget extends AbstractWidget {
         private final IntSupplier getter;
         private final IntConsumer setter;
         private final Identifier wheelTextureId;
         private final Identifier valueTextureId;
         private final Identifier alphaTextureId;
-        private NativeImageBackedTexture wheelTexture;
-        private NativeImageBackedTexture valueTexture;
-        private NativeImageBackedTexture alphaTexture;
+        private DynamicTexture wheelTexture;
+        private DynamicTexture valueTexture;
+        private DynamicTexture alphaTexture;
         private int cachedWheelSize = -1;
         private int cachedValueWidth = -1;
         private float currentHue;
@@ -2119,30 +2120,30 @@ public final class AxisRulerConfigScreen extends Screen {
         private boolean draggingAlpha;
 
         private ColorPickerWidget(int x, int y, int width, int height, IntSupplier getter, IntConsumer setter) {
-            super(x, y, width, height, Text.empty());
+            super(x, y, width, height, Component.empty());
             this.getter = getter;
             this.setter = setter;
             int instanceId = System.identityHashCode(this);
-            this.wheelTextureId = Identifier.of("axisruler", "palette_wheel_" + Integer.toUnsignedString(instanceId));
-            this.valueTextureId = Identifier.of("axisruler", "palette_value_" + Integer.toUnsignedString(instanceId));
-            this.alphaTextureId = Identifier.of("axisruler", "palette_alpha_" + Integer.toUnsignedString(instanceId));
+            this.wheelTextureId = Identifier.fromNamespaceAndPath("axisruler", "palette_wheel_" + Integer.toUnsignedString(instanceId));
+            this.valueTextureId = Identifier.fromNamespaceAndPath("axisruler", "palette_value_" + Integer.toUnsignedString(instanceId));
+            this.alphaTextureId = Identifier.fromNamespaceAndPath("axisruler", "palette_alpha_" + Integer.toUnsignedString(instanceId));
             syncColorState(getter.getAsInt());
         }
 
         @Override
-        public void onClick(Click click, boolean doubleClick) {
+        public void onClick(MouseButtonEvent click, boolean doubleClick) {
             handle(click.x(), click.y());
         }
 
         @Override
-        protected void onDrag(Click click, double deltaX, double deltaY) {
+        protected void onDrag(MouseButtonEvent click, double deltaX, double deltaY) {
             if (draggingWheel || draggingValue || draggingAlpha) {
                 handle(click.x(), click.y());
             }
         }
 
         @Override
-        public void onRelease(Click click) {
+        public void onRelease(MouseButtonEvent click) {
             draggingWheel = false;
             draggingValue = false;
             draggingAlpha = false;
@@ -2174,7 +2175,7 @@ public final class AxisRulerConfigScreen extends Screen {
 
             if (inside(mouseX, mouseY, valueX, getY(), valueWidth, wheelSize) || draggingValue) {
                 draggingValue = true;
-                float value = 1.0F - MathHelper.clamp((float) ((mouseY - getY()) / wheelSize), 0.0F, 1.0F);
+                float value = 1.0F - Mth.clamp((float) ((mouseY - getY()) / wheelSize), 0.0F, 1.0F);
                 int updatedArgb = ColorUtils.withAlpha(ColorUtils.hsvToRgb(currentHue, currentSaturation, value), currentAlpha);
                 setter.accept(updatedArgb);
                 syncColorState(updatedArgb);
@@ -2183,7 +2184,7 @@ public final class AxisRulerConfigScreen extends Screen {
 
             if (inside(mouseX, mouseY, getX(), alphaY, wheelSize, 12) || draggingAlpha) {
                 draggingAlpha = true;
-                int newAlpha = Math.round(MathHelper.clamp((float) ((mouseX - getX()) / wheelSize), 0.0F, 1.0F) * 255.0F);
+                int newAlpha = Math.round(Mth.clamp((float) ((mouseX - getX()) / wheelSize), 0.0F, 1.0F) * 255.0F);
                 int updatedArgb = ColorUtils.withAlpha(currentArgb, newAlpha);
                 setter.accept(updatedArgb);
                 syncColorState(updatedArgb);
@@ -2191,7 +2192,7 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             syncColorState(getter.getAsInt());
             int wheelSize = Math.min(height - 28, width - 34);
             int radius = wheelSize / 2;
@@ -2208,9 +2209,9 @@ public final class AxisRulerConfigScreen extends Screen {
             context.fill(getX() - 4, getY() + height + 3, getX() + width + 4, getY() + height + 4, border);
             context.fill(getX() - 4, getY() - 4, getX() - 3, getY() + height + 4, border);
             context.fill(getX() + width + 3, getY() - 4, getX() + width + 4, getY() + height + 4, border);
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, wheelTextureId, getX(), getY(), 0.0F, 0.0F, wheelSize, wheelSize, wheelSize, wheelSize);
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, valueTextureId, valueX, getY(), 0.0F, 0.0F, valueWidth, wheelSize, valueWidth, wheelSize);
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, alphaTextureId, getX(), alphaY, 0.0F, 0.0F, wheelSize, 12, wheelSize, 12);
+            context.blit(RenderPipelines.GUI_TEXTURED, wheelTextureId, getX(), getY(), 0.0F, 0.0F, wheelSize, wheelSize, wheelSize, wheelSize);
+            context.blit(RenderPipelines.GUI_TEXTURED, valueTextureId, valueX, getY(), 0.0F, 0.0F, valueWidth, wheelSize, valueWidth, wheelSize);
+            context.blit(RenderPipelines.GUI_TEXTURED, alphaTextureId, getX(), alphaY, 0.0F, 0.0F, wheelSize, 12, wheelSize, 12);
 
             int selectorX = getX() + radius + Math.round((float) Math.cos(Math.toRadians(currentHue)) * currentSaturation * radius);
             int selectorY = getY() + radius + Math.round((float) Math.sin(Math.toRadians(currentHue)) * currentSaturation * radius);
@@ -2280,20 +2281,20 @@ public final class AxisRulerConfigScreen extends Screen {
 
         private void recreateWheelTexture(int wheelSize) {
             destroyTexture(wheelTextureId, wheelTexture);
-            wheelTexture = new NativeImageBackedTexture("axisruler_palette_wheel", wheelSize, wheelSize, false);
-            MinecraftClient.getInstance().getTextureManager().registerTexture(wheelTextureId, wheelTexture);
+            wheelTexture = new DynamicTexture("axisruler_palette_wheel", wheelSize, wheelSize, false);
+            Minecraft.getInstance().getTextureManager().register(wheelTextureId, wheelTexture);
         }
 
         private void recreateValueTexture(int valueWidth, int wheelSize) {
             destroyTexture(valueTextureId, valueTexture);
-            valueTexture = new NativeImageBackedTexture("axisruler_palette_value", valueWidth, wheelSize, false);
-            MinecraftClient.getInstance().getTextureManager().registerTexture(valueTextureId, valueTexture);
+            valueTexture = new DynamicTexture("axisruler_palette_value", valueWidth, wheelSize, false);
+            Minecraft.getInstance().getTextureManager().register(valueTextureId, valueTexture);
         }
 
         private void recreateAlphaTexture(int wheelSize) {
             destroyTexture(alphaTextureId, alphaTexture);
-            alphaTexture = new NativeImageBackedTexture("axisruler_palette_alpha", wheelSize, 12, false);
-            MinecraftClient.getInstance().getTextureManager().registerTexture(alphaTextureId, alphaTexture);
+            alphaTexture = new DynamicTexture("axisruler_palette_alpha", wheelSize, 12, false);
+            Minecraft.getInstance().getTextureManager().register(alphaTextureId, alphaTexture);
         }
 
         private void uploadDirtyTextures() {
@@ -2315,7 +2316,7 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         private void rebuildWheelTexture() {
-            NativeImage image = wheelTexture.getImage();
+            NativeImage image = wheelTexture.getPixels();
             if (image == null) {
                 return;
             }
@@ -2325,9 +2326,9 @@ public final class AxisRulerConfigScreen extends Screen {
                 float dy = py - radius + 0.5F;
                 for (int px = 0; px < wheelSize; px++) {
                     float dx = px - radius + 0.5F;
-                    float distance = MathHelper.sqrt(dx * dx + dy * dy);
+                    float distance = Mth.sqrt(dx * dx + dy * dy);
                     if (distance > radius) {
-                        image.setColorArgb(px, py, 0x00000000);
+                        image.setPixel(px, py, 0x00000000);
                         continue;
                     }
                     float saturation = radius == 0 ? 0.0F : distance / radius;
@@ -2335,13 +2336,13 @@ public final class AxisRulerConfigScreen extends Screen {
                     if (hue < 0.0F) {
                         hue += 360.0F;
                     }
-                    image.setColorArgb(px, py, ColorUtils.hsvToRgb(hue, saturation, currentValue));
+                    image.setPixel(px, py, ColorUtils.hsvToRgb(hue, saturation, currentValue));
                 }
             }
         }
 
         private void rebuildValueTexture() {
-            NativeImage image = valueTexture.getImage();
+            NativeImage image = valueTexture.getPixels();
             if (image == null) {
                 return;
             }
@@ -2350,13 +2351,13 @@ public final class AxisRulerConfigScreen extends Screen {
                 float value = 1.0F - py / (float) Math.max(1, height - 1);
                 int color = ColorUtils.hsvToRgb(currentHue, currentSaturation, value);
                 for (int px = 0; px < cachedValueWidth; px++) {
-                    image.setColorArgb(px, py, color);
+                    image.setPixel(px, py, color);
                 }
             }
         }
 
         private void rebuildAlphaTexture() {
-            NativeImage image = alphaTexture.getImage();
+            NativeImage image = alphaTexture.getPixels();
             if (image == null) {
                 return;
             }
@@ -2364,16 +2365,16 @@ public final class AxisRulerConfigScreen extends Screen {
                 int alpha = Math.round((px / (float) Math.max(1, cachedWheelSize - 1)) * 255.0F);
                 int color = ColorUtils.withAlpha(currentArgb, alpha);
                 for (int py = 0; py < 12; py++) {
-                    image.setColorArgb(px, py, color);
+                    image.setPixel(px, py, color);
                 }
             }
         }
 
-        private void destroyTexture(Identifier id, NativeImageBackedTexture texture) {
+        private void destroyTexture(Identifier id, DynamicTexture texture) {
             if (texture == null) {
                 return;
             }
-            MinecraftClient.getInstance().getTextureManager().destroyTexture(id);
+            Minecraft.getInstance().getTextureManager().release(id);
             texture.close();
         }
 
@@ -2391,7 +2392,9 @@ public final class AxisRulerConfigScreen extends Screen {
         }
 
         @Override
-        protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {
         }
     }
 }
+
+

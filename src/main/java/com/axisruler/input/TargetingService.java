@@ -3,17 +3,17 @@ package com.axisruler.input;
 import com.axisruler.measure.MeasurePoint;
 import java.util.Objects;
 import java.util.Optional;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 public final class TargetingService {
-    public Optional<MeasurePoint> targetedBlock(MinecraftClient client) {
+    public Optional<MeasurePoint> targetedBlock(Minecraft client) {
         Objects.requireNonNull(client, "client");
-        ClientWorld world = client.world;
-        HitResult crosshairTarget = client.crosshairTarget;
+        ClientLevel world = client.level;
+        HitResult crosshairTarget = client.hitResult;
         if (world == null || crosshairTarget == null) {
             return Optional.empty();
         }
@@ -25,6 +25,6 @@ public final class TargetingService {
         }
 
         BlockPos blockPos = blockHitResult.getBlockPos();
-        return Optional.of(MeasurePoint.of(world.getRegistryKey(), blockPos));
+        return Optional.of(MeasurePoint.of(world.dimension(), blockPos));
     }
 }

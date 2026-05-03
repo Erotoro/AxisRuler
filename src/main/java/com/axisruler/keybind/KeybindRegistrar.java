@@ -2,26 +2,26 @@ package com.axisruler.keybind;
 
 import com.axisruler.util.AxisRulerText;
 import com.axisruler.util.ModConstants;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.util.Identifier;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 public final class KeybindRegistrar {
-    private final KeyBinding.Category category = KeyBinding.Category.create(Identifier.of(ModConstants.MOD_ID, "controls"));
-    private List<KeyBinding> keyBindings = List.of();
-    private KeyBinding setPointA;
-    private KeyBinding setPointB;
-    private KeyBinding clearPoints;
-    private KeyBinding swapPoints;
-    private KeyBinding cycleMode;
-    private KeyBinding toggleHud;
-    private KeyBinding toggleGuides;
-    private KeyBinding toggleLabels;
-    private KeyBinding toggleLine;
-    private KeyBinding copyMeasurement;
+    private final KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(ModConstants.MOD_ID, "controls"));
+    private List<KeyMapping> keyBindings = List.of();
+    private KeyMapping setPointA;
+    private KeyMapping setPointB;
+    private KeyMapping clearPoints;
+    private KeyMapping swapPoints;
+    private KeyMapping cycleMode;
+    private KeyMapping toggleHud;
+    private KeyMapping toggleGuides;
+    private KeyMapping toggleLabels;
+    private KeyMapping toggleLine;
+    private KeyMapping copyMeasurement;
     private boolean registered;
 
     public void register() {
@@ -54,65 +54,65 @@ public final class KeybindRegistrar {
         registered = true;
     }
 
-    public List<KeyBinding> keyBindings() {
+    public List<KeyMapping> keyBindings() {
         ensureRegistered();
         return keyBindings;
     }
 
-    public KeyBinding setPointA() {
+    public KeyMapping setPointA() {
         ensureRegistered();
         return setPointA;
     }
 
-    public KeyBinding setPointB() {
+    public KeyMapping setPointB() {
         ensureRegistered();
         return setPointB;
     }
 
-    public KeyBinding clearPoints() {
+    public KeyMapping clearPoints() {
         ensureRegistered();
         return clearPoints;
     }
 
-    public KeyBinding swapPoints() {
+    public KeyMapping swapPoints() {
         ensureRegistered();
         return swapPoints;
     }
 
-    public KeyBinding cycleMode() {
+    public KeyMapping cycleMode() {
         ensureRegistered();
         return cycleMode;
     }
 
-    public KeyBinding toggleHud() {
+    public KeyMapping toggleHud() {
         ensureRegistered();
         return toggleHud;
     }
 
-    public KeyBinding toggleGuides() {
+    public KeyMapping toggleGuides() {
         ensureRegistered();
         return toggleGuides;
     }
 
-    public KeyBinding toggleLabels() {
+    public KeyMapping toggleLabels() {
         ensureRegistered();
         return toggleLabels;
     }
 
-    public KeyBinding toggleLine() {
+    public KeyMapping toggleLine() {
         ensureRegistered();
         return toggleLine;
     }
 
-    public KeyBinding copyMeasurement() {
+    public KeyMapping copyMeasurement() {
         ensureRegistered();
         return copyMeasurement;
     }
 
-    private KeyBinding registerKey(String translationKey, int defaultKey) {
-        return KeyBindingHelper.registerKeyBinding(new KeyBinding(
+    private KeyMapping registerKey(String translationKey, int defaultKey) {
+        return KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 translationKey,
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 defaultKey,
                 category
         ));

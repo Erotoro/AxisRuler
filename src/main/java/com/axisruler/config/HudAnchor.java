@@ -1,7 +1,7 @@
 package com.axisruler.config;
 
 import java.util.Locale;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public enum HudAnchor {
     TOP_LEFT,
@@ -31,8 +31,8 @@ public enum HudAnchor {
         return values[(ordinal() + 1) % values.length];
     }
 
-    public Text localized() {
-        return Text.translatable("axisruler.config.anchor." + name().toLowerCase(Locale.ROOT));
+    public Component localized() {
+        return Component.translatable("axisruler.config.anchor." + name().toLowerCase(Locale.ROOT));
     }
 
     @Override

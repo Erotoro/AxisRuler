@@ -1,7 +1,7 @@
 package com.axisruler.config;
 
 import java.util.Locale;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public enum LabelBackgroundMode {
     NONE,
@@ -28,8 +28,8 @@ public enum LabelBackgroundMode {
         return values[(ordinal() + 1) % values.length];
     }
 
-    public Text localized() {
-        return Text.translatable("axisruler.config.background." + name().toLowerCase(Locale.ROOT));
+    public Component localized() {
+        return Component.translatable("axisruler.config.background." + name().toLowerCase(Locale.ROOT));
     }
 
     @Override

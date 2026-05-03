@@ -1,5 +1,5 @@
 plugins {
-    id "fabric-loom" version "1.16.1"
+    id "net.fabricmc.fabric-loom" version "${loom_version}"
     id "maven-publish"
 }
 
@@ -22,15 +22,13 @@ base {
     archivesName = project.archives_base_name
 }
 
-def releaseJarName = "axisruler-fabric-${project.minecraft_version}-v1.0.jar"
+def releaseJarName = "axisruler-fabric-${project.minecraft_version}-v${project.version}.jar"
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
-    modImplementation include("dev.isxander:yet-another-config-lib:${project.yacl_version}")
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    compileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
 processResources {
@@ -39,7 +37,6 @@ processResources {
     inputs.property "loader_version", project.loader_version
     inputs.property "fabric_version", project.fabric_version
     inputs.property "modmenu_version", project.modmenu_version
-    inputs.property "yacl_version", project.yacl_version
 
     filesMatching("fabric.mod.json") {
         expand(
@@ -47,32 +44,30 @@ processResources {
                 "minecraft_version": inputs.properties.minecraft_version,
                 "loader_version": inputs.properties.loader_version,
                 "fabric_version": inputs.properties.fabric_version,
-                "modmenu_version": inputs.properties.modmenu_version,
-                "yacl_version": inputs.properties.yacl_version
+                "modmenu_version": inputs.properties.modmenu_version
         )
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
-    options.release = 21
+    options.release = 25
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
     withSourcesJar()
 }
 
 jar {
+    archiveFileName = releaseJarName
     from("LICENSE") {
         rename { "${it}_${project.archives_base_name}" }
     }
-}
-
-tasks.named("remapJar") {
-    archiveFileName = releaseJarName
 }
 
 publishing {

@@ -2,8 +2,8 @@ package com.axisruler.measure;
 
 import java.util.Locale;
 import java.util.Objects;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 public final class MeasurementFormatter {
     private MeasurementFormatter() {
@@ -30,7 +30,7 @@ public final class MeasurementFormatter {
         return blockPos.getX() + " " + blockPos.getY() + " " + blockPos.getZ();
     }
 
-    public static String formatVec3(Vec3d vec3) {
+    public static String formatVec3(Vec3 vec3) {
         Objects.requireNonNull(vec3, "vec3");
         return formatDecimal(vec3.x) + ", " + formatDecimal(vec3.y) + ", " + formatDecimal(vec3.z);
     }

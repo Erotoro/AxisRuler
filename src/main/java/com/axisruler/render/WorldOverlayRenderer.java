@@ -7,17 +7,17 @@ import com.axisruler.measure.MeasurementResult;
 import com.axisruler.measure.MeasurementService;
 import com.axisruler.measure.SelectionMode;
 import com.axisruler.measure.SelectionState;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 public final class WorldOverlayRenderer {
     private static final boolean ENABLE_LABEL_SANITY_CHECK = false;
@@ -48,16 +48,16 @@ public final class WorldOverlayRenderer {
     }
 
     public void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::renderSelection);
+        LevelRenderEvents.BEFORE_GIZMOS.register(this::renderSelection);
     }
 
-    private void renderSelection(WorldRenderContext context) {
+    private void renderSelection(LevelRenderContext context) {
         AxisRulerConfig config = configManager.config();
         if (!config.enabled()) {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null || client.player == null) {
             return;
         }
@@ -67,26 +67,27 @@ public final class WorldOverlayRenderer {
             return;
         }
 
-        ClientWorld world = client.world;
+        ClientLevel world = client.level;
         if (world == null) {
             return;
         }
 
-        String currentWorldKey = world.getRegistryKey().getValue().toString();
+        String currentWorldKey = world.dimension().identifier().toString();
         MeasurePoint pointA = state.pointAOrNull();
         MeasurePoint pointB = state.pointBOrNull();
         if (!shouldRenderAny(state, currentWorldKey, pointA, pointB)) {
             return;
         }
 
-        VertexConsumerProvider consumers = context.consumers();
-        MatrixStack matrices = context.matrices();
-        matrices.push();
+        MultiBufferSource consumers = context.bufferSource();
+        PoseStack matrices = context.poseStack();
+        Vec3 cameraPos = Minecraft.getInstance().gameRenderer.getMainCamera().position();
+        matrices.pushPose();
         try {
             matrices.translate(
-                    -context.worldState().cameraRenderState.pos.x,
-                    -context.worldState().cameraRenderState.pos.y,
-                    -context.worldState().cameraRenderState.pos.z
+                    -cameraPos.x,
+                    -cameraPos.y,
+                    -cameraPos.z
             );
 
             if (isInCurrentWorld(currentWorldKey, pointA)) {
@@ -107,14 +108,14 @@ public final class WorldOverlayRenderer {
 
             renderSelectionMode(context, matrices, consumers, config, state, result);
         } finally {
-            matrices.pop();
+            matrices.popPose();
         }
     }
 
     private void renderSelectionMode(
-            WorldRenderContext context,
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            LevelRenderContext context,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
             SelectionState state,
             MeasurementResult result
@@ -162,8 +163,8 @@ public final class WorldOverlayRenderer {
     }
 
     private void renderSelectionFill(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
             MeasurementResult result
     ) {
@@ -187,8 +188,8 @@ public final class WorldOverlayRenderer {
     }
 
     private void renderSelectionOutline(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
             MeasurementResult result
     ) {
@@ -206,8 +207,8 @@ public final class WorldOverlayRenderer {
     }
 
     private void renderLineModePath(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
             MeasurementResult result
     ) {
@@ -217,10 +218,10 @@ public final class WorldOverlayRenderer {
             return;
         }
 
-        Vec3d start = blockCenter(pointA.blockPos());
-        Vec3d xTurn = new Vec3d(pointB.x() + 0.5D, pointA.y() + 0.5D, pointA.z() + 0.5D);
-        Vec3d yTurn = new Vec3d(pointB.x() + 0.5D, pointB.y() + 0.5D, pointA.z() + 0.5D);
-        Vec3d end = blockCenter(pointB.blockPos());
+        Vec3 start = blockCenter(pointA.blockPos());
+        Vec3 xTurn = new Vec3(pointB.x() + 0.5D, pointA.y() + 0.5D, pointA.z() + 0.5D);
+        Vec3 yTurn = new Vec3(pointB.x() + 0.5D, pointB.y() + 0.5D, pointA.z() + 0.5D);
+        Vec3 end = blockCenter(pointB.blockPos());
         int color = config.lineColorArgb(config.connectionLineColorArgb());
 
         drawThinAxisSegment(matrices, consumers, config, start, xTurn, color);
@@ -229,12 +230,12 @@ public final class WorldOverlayRenderer {
     }
 
     private void renderCenterMarker(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
             MeasurementResult result
     ) {
-        Vec3d center = result.center();
+        Vec3 center = result.center();
         RenderPrimitives.drawFilledBox(
                 matrices,
                 consumers,
@@ -249,19 +250,19 @@ public final class WorldOverlayRenderer {
     }
 
     private void renderDimensionCallouts(
-            WorldRenderContext context,
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            LevelRenderContext context,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
             MeasurementResult result
     ) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.textRenderer == null) {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.font == null) {
             return;
         }
 
-        TextRenderer textRenderer = client.textRenderer;
-        CalloutLayout layout = calloutLayout(result, context.worldState().cameraRenderState.pos, config);
+        Font textRenderer = client.font;
+        CalloutLayout layout = calloutLayout(result, Minecraft.getInstance().gameRenderer.getMainCamera().position(), config);
 
         renderCallout(matrices, consumers, textRenderer, context, layout.x(), Integer.toString(result.sizeX()), config.guideColorArgb(config.xGuideColorArgb()), config);
         renderCallout(matrices, consumers, textRenderer, context, layout.y(), Integer.toString(result.sizeY()), config.guideColorArgb(config.yGuideColorArgb()), config);
@@ -272,7 +273,7 @@ public final class WorldOverlayRenderer {
                     matrices,
                     consumers,
                     textRenderer,
-                    context.worldState().cameraRenderState,
+                    Minecraft.getInstance().gameRenderer.getMainCamera(),
                     "TEST",
                     result.center().add(0.0D, 1.1D, 0.0D),
                     TEST_LABEL_SCALE,
@@ -285,27 +286,27 @@ public final class WorldOverlayRenderer {
     }
 
     private void renderCallout(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
-            TextRenderer textRenderer,
-            WorldRenderContext context,
+            PoseStack matrices,
+            MultiBufferSource consumers,
+            Font textRenderer,
+            LevelRenderContext context,
             DimensionCallout callout,
             String label,
             int lineColor,
             AxisRulerConfig config
     ) {
-        Vec3d cameraPos = context.worldState().cameraRenderState.pos;
-        Vec3d lineStart = depthBiased(callout.lineStart(), cameraPos);
-        Vec3d lineEnd = depthBiased(callout.lineEnd(), cameraPos);
-        Vec3d anchorStart = depthBiased(callout.anchorStart(), cameraPos);
-        Vec3d anchorEnd = depthBiased(callout.anchorEnd(), cameraPos);
-        Vec3d anchor2Start = depthBiased(callout.anchor2Start(), cameraPos);
-        Vec3d anchor2End = depthBiased(callout.anchor2End(), cameraPos);
-        Vec3d tickStartA = depthBiased(callout.tickStartA(), cameraPos);
-        Vec3d tickStartB = depthBiased(callout.tickStartB(), cameraPos);
-        Vec3d tickEndA = depthBiased(callout.tickEndA(), cameraPos);
-        Vec3d tickEndB = depthBiased(callout.tickEndB(), cameraPos);
-        Vec3d labelPosition = depthBiased(callout.labelPosition(), cameraPos);
+        Vec3 cameraPos = Minecraft.getInstance().gameRenderer.getMainCamera().position();
+        Vec3 lineStart = depthBiased(callout.lineStart(), cameraPos);
+        Vec3 lineEnd = depthBiased(callout.lineEnd(), cameraPos);
+        Vec3 anchorStart = depthBiased(callout.anchorStart(), cameraPos);
+        Vec3 anchorEnd = depthBiased(callout.anchorEnd(), cameraPos);
+        Vec3 anchor2Start = depthBiased(callout.anchor2Start(), cameraPos);
+        Vec3 anchor2End = depthBiased(callout.anchor2End(), cameraPos);
+        Vec3 tickStartA = depthBiased(callout.tickStartA(), cameraPos);
+        Vec3 tickStartB = depthBiased(callout.tickStartB(), cameraPos);
+        Vec3 tickEndA = depthBiased(callout.tickEndA(), cameraPos);
+        Vec3 tickEndB = depthBiased(callout.tickEndB(), cameraPos);
+        Vec3 labelPosition = depthBiased(callout.labelPosition(), cameraPos);
 
         drawCalloutSegment(matrices, consumers, config, lineStart, lineEnd, lineColor);
         drawCalloutSegment(matrices, consumers, config, anchorStart, anchorEnd, lineColor);
@@ -318,7 +319,7 @@ public final class WorldOverlayRenderer {
                 matrices,
                 consumers,
                 textRenderer,
-                context.worldState().cameraRenderState,
+                Minecraft.getInstance().gameRenderer.getMainCamera(),
                 label,
                 labelPosition,
                 labelScale,
@@ -329,7 +330,7 @@ public final class WorldOverlayRenderer {
         );
     }
 
-    private CalloutLayout calloutLayout(MeasurementResult result, Vec3d cameraPos, AxisRulerConfig config) {
+    private CalloutLayout calloutLayout(MeasurementResult result, Vec3 cameraPos, AxisRulerConfig config) {
         double minX = result.minBlockPos().getX();
         double minY = result.minBlockPos().getY();
         double minZ = result.minBlockPos().getZ();
@@ -350,56 +351,56 @@ public final class WorldOverlayRenderer {
         double lowerGuideY = minY - Math.max(LOWER_CALLOUT_DROP, horizontalOffset * 0.86D);
 
         DimensionCallout xCallout = new DimensionCallout(
-                new Vec3d(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
-                new Vec3d(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
-                new Vec3d(minX, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
-                new Vec3d(maxX, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
-                new Vec3d(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ - tickHalfLength),
-                new Vec3d(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ + tickHalfLength),
-                new Vec3d(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ - tickHalfLength),
-                new Vec3d(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ + tickHalfLength),
-                new Vec3d(centerX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ)
+                new Vec3(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
+                new Vec3(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
+                new Vec3(minX, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
+                new Vec3(maxX, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ),
+                new Vec3(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ - tickHalfLength),
+                new Vec3(minX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ + tickHalfLength),
+                new Vec3(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ - tickHalfLength),
+                new Vec3(maxX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ + tickHalfLength),
+                new Vec3(centerX, maxY + CALLOUT_LINE_Y_OFFSET, topGuideZ)
         );
 
         DimensionCallout yCallout = new DimensionCallout(
-                new Vec3d(sideGuideX, minY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(nearWest ? minX : maxX, minY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX, minY, nearNorth ? minZ : maxZ),
-                new Vec3d(nearWest ? minX : maxX, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX - tickHalfLength, minY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX + tickHalfLength, minY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX - tickHalfLength, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX + tickHalfLength, maxY, nearNorth ? minZ : maxZ),
-                new Vec3d(sideGuideX, centerY, nearNorth ? minZ : maxZ)
+                new Vec3(sideGuideX, minY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(nearWest ? minX : maxX, minY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX, minY, nearNorth ? minZ : maxZ),
+                new Vec3(nearWest ? minX : maxX, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX - tickHalfLength, minY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX + tickHalfLength, minY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX - tickHalfLength, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX + tickHalfLength, maxY, nearNorth ? minZ : maxZ),
+                new Vec3(sideGuideX, centerY, nearNorth ? minZ : maxZ)
         );
 
         DimensionCallout zCallout = new DimensionCallout(
-                new Vec3d(lowerGuideX, lowerGuideY, minZ),
-                new Vec3d(lowerGuideX, lowerGuideY, maxZ),
-                new Vec3d(nearWest ? minX : maxX, minY, minZ),
-                new Vec3d(lowerGuideX, lowerGuideY, minZ),
-                new Vec3d(nearWest ? minX : maxX, minY, maxZ),
-                new Vec3d(lowerGuideX, lowerGuideY, maxZ),
-                new Vec3d(lowerGuideX, lowerGuideY - tickHalfLength, minZ),
-                new Vec3d(lowerGuideX, lowerGuideY + tickHalfLength, minZ),
-                new Vec3d(lowerGuideX, lowerGuideY - tickHalfLength, maxZ),
-                new Vec3d(lowerGuideX, lowerGuideY + tickHalfLength, maxZ),
-                new Vec3d(lowerGuideX, lowerGuideY, centerZ)
+                new Vec3(lowerGuideX, lowerGuideY, minZ),
+                new Vec3(lowerGuideX, lowerGuideY, maxZ),
+                new Vec3(nearWest ? minX : maxX, minY, minZ),
+                new Vec3(lowerGuideX, lowerGuideY, minZ),
+                new Vec3(nearWest ? minX : maxX, minY, maxZ),
+                new Vec3(lowerGuideX, lowerGuideY, maxZ),
+                new Vec3(lowerGuideX, lowerGuideY - tickHalfLength, minZ),
+                new Vec3(lowerGuideX, lowerGuideY + tickHalfLength, minZ),
+                new Vec3(lowerGuideX, lowerGuideY - tickHalfLength, maxZ),
+                new Vec3(lowerGuideX, lowerGuideY + tickHalfLength, maxZ),
+                new Vec3(lowerGuideX, lowerGuideY, centerZ)
         );
 
         return new CalloutLayout(xCallout, yCallout, zCallout);
     }
 
     private void drawThinAxisSegment(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
-            Vec3d start,
-            Vec3d end,
+            Vec3 start,
+            Vec3 end,
             int color
     ) {
         double halfThickness = lineHalfThickness(config);
@@ -413,11 +414,11 @@ public final class WorldOverlayRenderer {
     }
 
     private void drawCalloutSegment(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             AxisRulerConfig config,
-            Vec3d start,
-            Vec3d end,
+            Vec3 start,
+            Vec3 end,
             int color
     ) {
         double halfThickness = calloutHalfThickness(config);
@@ -430,20 +431,20 @@ public final class WorldOverlayRenderer {
         RenderPrimitives.drawFilledBox(matrices, consumers, minX, minY, minZ, maxX, maxY, maxZ, color);
     }
 
-    private float distanceScaledLabelSize(AxisRulerConfig config, Vec3d cameraPos, Vec3d labelPos) {
-        double distance = Math.sqrt(cameraPos.squaredDistanceTo(labelPos));
+    private float distanceScaledLabelSize(AxisRulerConfig config, Vec3 cameraPos, Vec3 labelPos) {
+        double distance = Math.sqrt(cameraPos.distanceToSqr(labelPos));
         float baseScale = config.labelScale();
         float scaled = baseScale + (float) distance * LABEL_DISTANCE_FACTOR;
         return Math.max(Math.max(MIN_LABEL_SCALE, baseScale * 0.82F), Math.min(MAX_LABEL_SCALE, scaled));
     }
 
-    private Vec3d depthBiased(Vec3d point, Vec3d cameraPos) {
-        Vec3d toCamera = cameraPos.subtract(point);
-        double lengthSquared = toCamera.lengthSquared();
+    private Vec3 depthBiased(Vec3 point, Vec3 cameraPos) {
+        Vec3 toCamera = cameraPos.subtract(point);
+        double lengthSquared = toCamera.lengthSqr();
         if (lengthSquared < 1.0E-6D) {
             return point;
         }
-        return point.add(toCamera.multiply(CALLOUT_DEPTH_BIAS / Math.sqrt(lengthSquared)));
+        return point.add(toCamera.scale(CALLOUT_DEPTH_BIAS / Math.sqrt(lengthSquared)));
     }
 
     private double lineHalfThickness(AxisRulerConfig config) {
@@ -454,8 +455,8 @@ public final class WorldOverlayRenderer {
         return BASE_CALLOUT_HALF_THICKNESS * config.lineThickness();
     }
 
-    private Vec3d blockCenter(BlockPos pos) {
-        return new Vec3d(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
+    private Vec3 blockCenter(BlockPos pos) {
+        return new Vec3(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
     }
 
     private int withAlpha(int color, int alpha) {
@@ -464,7 +465,7 @@ public final class WorldOverlayRenderer {
 
     private VoxelShape selectionShape(int sizeX, int sizeY, int sizeZ) {
         if (cachedSelectionShape == null || cachedSizeX != sizeX || cachedSizeY != sizeY || cachedSizeZ != sizeZ) {
-            cachedSelectionShape = VoxelShapes.cuboid(0.0D, 0.0D, 0.0D, sizeX, sizeY, sizeZ);
+            cachedSelectionShape = Shapes.box(0.0D, 0.0D, 0.0D, sizeX, sizeY, sizeZ);
             cachedSizeX = sizeX;
             cachedSizeY = sizeY;
             cachedSizeZ = sizeZ;
@@ -473,17 +474,17 @@ public final class WorldOverlayRenderer {
     }
 
     private record DimensionCallout(
-            Vec3d lineStart,
-            Vec3d lineEnd,
-            Vec3d anchorStart,
-            Vec3d anchorEnd,
-            Vec3d anchor2Start,
-            Vec3d anchor2End,
-            Vec3d tickStartA,
-            Vec3d tickStartB,
-            Vec3d tickEndA,
-            Vec3d tickEndB,
-            Vec3d labelPosition
+            Vec3 lineStart,
+            Vec3 lineEnd,
+            Vec3 anchorStart,
+            Vec3 anchorEnd,
+            Vec3 anchor2Start,
+            Vec3 anchor2End,
+            Vec3 tickStartA,
+            Vec3 tickStartB,
+            Vec3 tickEndA,
+            Vec3 tickEndB,
+            Vec3 labelPosition
     ) {
     }
 

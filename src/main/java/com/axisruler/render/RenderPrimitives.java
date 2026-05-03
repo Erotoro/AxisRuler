@@ -1,20 +1,21 @@
 package com.axisruler.render;
 
 import com.axisruler.config.LabelBackgroundMode;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.render.RenderLayers;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.VertexRendering;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.ShapeRenderer;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 public final class RenderPrimitives {
-    private static final VoxelShape FULL_BLOCK_SHAPE = VoxelShapes.fullCube();
+    private static final VoxelShape FULL_BLOCK_SHAPE = Shapes.block();
     private static final int FULL_BRIGHT_LIGHT = 0x00F000F0;
     private static final float DEFAULT_MARKER_LINE_WIDTH = 1.75F;
 
@@ -22,8 +23,8 @@ public final class RenderPrimitives {
     }
 
     public static void drawBlockOutline(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             BlockPos pos,
             int color,
             float lineWidth
@@ -32,8 +33,8 @@ public final class RenderPrimitives {
     }
 
     public static void drawBlockOutline(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             BlockPos pos,
             int color
     ) {
@@ -41,8 +42,8 @@ public final class RenderPrimitives {
     }
 
     public static void drawShapeOutline(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             VoxelShape shape,
             double offsetX,
             double offsetY,
@@ -54,8 +55,8 @@ public final class RenderPrimitives {
     }
 
     public static void drawFilledBox(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             double minX,
             double minY,
             double minZ,
@@ -64,8 +65,8 @@ public final class RenderPrimitives {
             double maxZ,
             int color
     ) {
-        VertexConsumer consumer = consumers.getBuffer(RenderLayers.debugFilledBox());
-        MatrixStack.Entry entry = matrices.peek();
+        VertexConsumer consumer = consumers.getBuffer(RenderTypes.debugFilledBox());
+        PoseStack.Pose entry = matrices.last();
         quad(consumer, entry, minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ, color);
         quad(consumer, entry, minX, minY, maxZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, minY, maxZ, color);
         quad(consumer, entry, minX, minY, minZ, minX, maxY, minZ, minX, maxY, maxZ, minX, minY, maxZ, color);
@@ -75,62 +76,62 @@ public final class RenderPrimitives {
     }
 
     public static void drawWorldLabel(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
-            TextRenderer textRenderer,
-            CameraRenderState cameraRenderState,
+            PoseStack matrices,
+            MultiBufferSource consumers,
+            Font textRenderer,
+            Camera camera,
             String label,
-            Vec3d position,
+            Vec3 position,
             float scale,
             int color,
             LabelBackgroundMode backgroundMode,
             int backgroundColor,
             boolean billboard
     ) {
-        matrices.push();
+            matrices.pushPose();
         try {
             matrices.translate(position.x, position.y, position.z);
             if (billboard) {
-                matrices.multiply(cameraRenderState.orientation);
+                matrices.mulPose(camera.rotation());
             }
             matrices.scale(scale, -scale, scale);
 
-            float textWidth = textRenderer.getWidth(label);
+            float textWidth = textRenderer.width(label);
             float textOffsetX = -textWidth / 2.0F;
             int effectiveBackgroundColor = backgroundColor(backgroundMode, backgroundColor);
 
-            textRenderer.draw(
+            textRenderer.drawInBatch(
                     label,
                     textOffsetX,
                     0.0F,
                     color,
                     false,
-                    matrices.peek().getPositionMatrix(),
+                    matrices.last().pose(),
                     consumers,
-                    TextRenderer.TextLayerType.SEE_THROUGH,
+                    Font.DisplayMode.SEE_THROUGH,
                     effectiveBackgroundColor,
                     FULL_BRIGHT_LIGHT
             );
-            textRenderer.draw(
+            textRenderer.drawInBatch(
                     label,
                     textOffsetX,
                     0.0F,
                     color,
                     false,
-                    matrices.peek().getPositionMatrix(),
+                    matrices.last().pose(),
                     consumers,
-                    TextRenderer.TextLayerType.NORMAL,
+                    Font.DisplayMode.NORMAL,
                     0x00000000,
                     FULL_BRIGHT_LIGHT
             );
         } finally {
-            matrices.pop();
+            matrices.popPose();
         }
     }
 
     private static void drawOutline(
-            MatrixStack matrices,
-            VertexConsumerProvider consumers,
+            PoseStack matrices,
+            MultiBufferSource consumers,
             VoxelShape shape,
             double offsetX,
             double offsetY,
@@ -138,13 +139,13 @@ public final class RenderPrimitives {
             int color,
             float lineWidth
     ) {
-        VertexConsumer consumer = consumers.getBuffer(RenderLayers.lines());
-        VertexRendering.drawOutline(matrices, consumer, shape, offsetX, offsetY, offsetZ, color, lineWidth);
+        VertexConsumer consumer = consumers.getBuffer(RenderTypes.lines());
+        ShapeRenderer.renderShape(matrices, consumer, shape, offsetX, offsetY, offsetZ, color, lineWidth);
     }
 
     private static void quad(
             VertexConsumer consumer,
-            MatrixStack.Entry entry,
+            PoseStack.Pose entry,
             double ax,
             double ay,
             double az,
@@ -159,10 +160,10 @@ public final class RenderPrimitives {
             double dz,
             int color
     ) {
-        consumer.vertex(entry, (float) ax, (float) ay, (float) az).color(color);
-        consumer.vertex(entry, (float) bx, (float) by, (float) bz).color(color);
-        consumer.vertex(entry, (float) cx, (float) cy, (float) cz).color(color);
-        consumer.vertex(entry, (float) dx, (float) dy, (float) dz).color(color);
+        consumer.addVertex(entry, (float) ax, (float) ay, (float) az).setColor(color);
+        consumer.addVertex(entry, (float) bx, (float) by, (float) bz).setColor(color);
+        consumer.addVertex(entry, (float) cx, (float) cy, (float) cz).setColor(color);
+        consumer.addVertex(entry, (float) dx, (float) dy, (float) dz).setColor(color);
     }
 
     private static int backgroundColor(LabelBackgroundMode mode, int color) {

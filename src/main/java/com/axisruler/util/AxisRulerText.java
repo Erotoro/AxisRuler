@@ -2,7 +2,7 @@ package com.axisruler.util;
 
 import com.axisruler.measure.MeasurePoint;
 import com.axisruler.measure.SelectionMode;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public final class AxisRulerText {
     public static final String KEY_CATEGORY = "key.categories.axisruler.controls";
@@ -50,63 +50,63 @@ public final class AxisRulerText {
     private AxisRulerText() {
     }
 
-    public static Text pointASet(MeasurePoint point) {
-        return Text.translatable(MESSAGE_POINT_A_SET, point.formatBlockPosition());
+    public static Component pointASet(MeasurePoint point) {
+        return Component.translatable(MESSAGE_POINT_A_SET, point.formatBlockPosition());
     }
 
-    public static Text pointBSet(MeasurePoint point) {
-        return Text.translatable(MESSAGE_POINT_B_SET, point.formatBlockPosition());
+    public static Component pointBSet(MeasurePoint point) {
+        return Component.translatable(MESSAGE_POINT_B_SET, point.formatBlockPosition());
     }
 
-    public static Text selectionCleared() {
-        return Text.translatable(MESSAGE_SELECTION_CLEARED);
+    public static Component selectionCleared() {
+        return Component.translatable(MESSAGE_SELECTION_CLEARED);
     }
 
-    public static Text pointsSwapped() {
-        return Text.translatable(MESSAGE_POINTS_SWAPPED);
+    public static Component pointsSwapped() {
+        return Component.translatable(MESSAGE_POINTS_SWAPPED);
     }
 
-    public static Text bothPointsRequired() {
-        return Text.translatable(MESSAGE_BOTH_POINTS_REQUIRED);
+    public static Component bothPointsRequired() {
+        return Component.translatable(MESSAGE_BOTH_POINTS_REQUIRED);
     }
 
-    public static Text mode(SelectionMode mode) {
-        return Text.translatable(MESSAGE_MODE, Text.translatable(mode.translationKey()));
+    public static Component mode(SelectionMode mode) {
+        return Component.translatable(MESSAGE_MODE, Component.translatable(mode.translationKey()));
     }
 
-    public static Text hud(boolean enabled) {
-        return Text.translatable(MESSAGE_HUD, enabledState(enabled));
+    public static Component hud(boolean enabled) {
+        return Component.translatable(MESSAGE_HUD, enabledState(enabled));
     }
 
-    public static Text guides(boolean enabled) {
-        return Text.translatable(MESSAGE_GUIDES, enabledState(enabled));
+    public static Component guides(boolean enabled) {
+        return Component.translatable(MESSAGE_GUIDES, enabledState(enabled));
     }
 
-    public static Text labels(boolean enabled) {
-        return Text.translatable(MESSAGE_LABELS, enabledState(enabled));
+    public static Component labels(boolean enabled) {
+        return Component.translatable(MESSAGE_LABELS, enabledState(enabled));
     }
 
-    public static Text line(boolean enabled) {
-        return Text.translatable(MESSAGE_LINE, enabledState(enabled));
+    public static Component line(boolean enabled) {
+        return Component.translatable(MESSAGE_LINE, enabledState(enabled));
     }
 
-    public static Text noBlockTarget() {
-        return Text.translatable(MESSAGE_NO_BLOCK_TARGET);
+    public static Component noBlockTarget() {
+        return Component.translatable(MESSAGE_NO_BLOCK_TARGET);
     }
 
-    public static Text measurementCopied() {
-        return Text.translatable(MESSAGE_MEASUREMENT_COPIED);
+    public static Component measurementCopied() {
+        return Component.translatable(MESSAGE_MEASUREMENT_COPIED);
     }
 
-    public static Text nothingToCopy() {
-        return Text.translatable(MESSAGE_NOTHING_TO_COPY);
+    public static Component nothingToCopy() {
+        return Component.translatable(MESSAGE_NOTHING_TO_COPY);
     }
 
-    public static Text copyDifferentWorlds() {
-        return Text.translatable(MESSAGE_COPY_DIFFERENT_WORLDS);
+    public static Component copyDifferentWorlds() {
+        return Component.translatable(MESSAGE_COPY_DIFFERENT_WORLDS);
     }
 
-    private static Text enabledState(boolean enabled) {
-        return Text.translatable(enabled ? MESSAGE_ENABLED : MESSAGE_DISABLED);
+    private static Component enabledState(boolean enabled) {
+        return Component.translatable(enabled ? MESSAGE_ENABLED : MESSAGE_DISABLED);
     }
 }

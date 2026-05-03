@@ -13,12 +13,12 @@ import com.axisruler.util.ModConstants;
 import java.util.Objects;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.resource.language.I18n;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.resources.Identifier;
 
 public final class HudOverlayRenderer {
     private static final Identifier HUD_ID = createHudId();
@@ -49,7 +49,7 @@ public final class HudOverlayRenderer {
         registered = true;
     }
 
-    private void renderHud(DrawContext context, RenderTickCounter tickCounter) {
+    private void renderHud(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         AxisRulerConfig config = configManager.config();
         if (!config.enabled()) {
             return;
@@ -66,16 +66,16 @@ public final class HudOverlayRenderer {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null
-                || client.textRenderer == null
-                || client.world == null
+                || client.font == null
+                || client.level == null
                 || client.player == null
-                || client.currentScreen != null) {
+                || client.screen != null) {
             return;
         }
 
-        TextRenderer textRenderer = client.textRenderer;
+        Font textRenderer = client.font;
         HudData hudData = hudData(textRenderer, config, state, pointA, pointB);
         PanelLayout layout = new PanelLayout(
                 panelX(context, config, hudData.width()),
@@ -90,7 +90,7 @@ public final class HudOverlayRenderer {
         }
     }
 
-    private HudData hudData(TextRenderer textRenderer, AxisRulerConfig config, SelectionState state, MeasurePoint pointA, MeasurePoint pointB) {
+    private HudData hudData(Font textRenderer, AxisRulerConfig config, SelectionState state, MeasurePoint pointA, MeasurePoint pointB) {
         int configHash = config.hashCode();
         if (cachedHudData != null
                 && Objects.equals(cachedPointA, pointA)
@@ -111,7 +111,7 @@ public final class HudOverlayRenderer {
         return hudData;
     }
 
-    private HudData buildPartialHudData(TextRenderer textRenderer, AxisRulerConfig config, MeasurePoint pointA, MeasurePoint pointB) {
+    private HudData buildPartialHudData(Font textRenderer, AxisRulerConfig config, MeasurePoint pointA, MeasurePoint pointB) {
         String title = translatedTitle();
         String value = pointA != null ? pointA.formatBlockPosition() : pointB.formatBlockPosition();
         String[] labels = {pointA != null ? tr(AxisRulerText.HUD_LABEL_A) : tr(AxisRulerText.HUD_LABEL_B)};
@@ -120,7 +120,7 @@ public final class HudOverlayRenderer {
         return createHudData(textRenderer, config, title, labels, values, colors);
     }
 
-    private HudData buildCompleteHudData(TextRenderer textRenderer, AxisRulerConfig config, SelectionState state, MeasurePoint pointA, MeasurePoint pointB) {
+    private HudData buildCompleteHudData(Font textRenderer, AxisRulerConfig config, SelectionState state, MeasurePoint pointA, MeasurePoint pointB) {
         String title = translatedTitle();
         MeasurementResult result = measurementService.calculate(pointA, pointB);
         if (!result.valid()) {
@@ -183,7 +183,7 @@ public final class HudOverlayRenderer {
         return createHudData(textRenderer, config, title, labels, values, fillColors(config.hudPrimaryTextColorArgb(), labels.length));
     }
 
-    private HudData createHudData(TextRenderer textRenderer, AxisRulerConfig config, String title, String[] labels, String[] values, int[] colors) {
+    private HudData createHudData(Font textRenderer, AxisRulerConfig config, String title, String[] labels, String[] values, int[] colors) {
         int width = panelWidth(textRenderer, config, title, values);
         int height = panelHeight(config, labels.length);
         return new HudData(title, width, height, labels, values, colors);
@@ -197,13 +197,13 @@ public final class HudOverlayRenderer {
         return colors;
     }
 
-    private void drawPanel(DrawContext context, AxisRulerConfig config, int panelX, int panelY, int width, int height) {
+    private void drawPanel(GuiGraphicsExtractor context, AxisRulerConfig config, int panelX, int panelY, int width, int height) {
         context.fill(panelX, panelY, panelX + width, panelY + height, config.effectiveHudBackgroundColorArgb());
         context.fill(panelX, panelY, panelX + 2, panelY + height, config.effectiveHudAccentColorArgb());
-        context.drawStrokedRectangle(panelX, panelY, width, height, config.effectiveHudBorderColorArgb());
+        context.outline(panelX, panelY, width, height, config.effectiveHudBorderColorArgb());
     }
 
-    private void drawTitle(DrawContext context, TextRenderer textRenderer, AxisRulerConfig config, int panelX, int panelY, int panelWidth, String title) {
+    private void drawTitle(GuiGraphicsExtractor context, Font textRenderer, AxisRulerConfig config, int panelX, int panelY, int panelWidth, String title) {
         int padding = scaled(config, PANEL_PADDING);
         drawText(context, textRenderer, config, title, panelX + padding, panelY + padding, config.hudTitleColorArgb());
         int separatorY = panelY + padding + scaled(config, ROW_HEIGHT) - 3;
@@ -211,8 +211,8 @@ public final class HudOverlayRenderer {
     }
 
     private void drawRow(
-            DrawContext context,
-            TextRenderer textRenderer,
+            GuiGraphicsExtractor context,
+            Font textRenderer,
             AxisRulerConfig config,
             int panelX,
             int panelY,
@@ -231,12 +231,12 @@ public final class HudOverlayRenderer {
         drawText(context, textRenderer, config, value, valueX, y, valueColor);
     }
 
-    private int panelWidth(TextRenderer textRenderer, AxisRulerConfig config, String title, String[] values) {
+    private int panelWidth(Font textRenderer, AxisRulerConfig config, String title, String[] values) {
         int padding = scaled(config, PANEL_PADDING);
         int labelColumnWidth = scaled(config, LABEL_COLUMN_WIDTH);
-        int longestValueWidth = textRenderer.getWidth(title);
+        int longestValueWidth = textRenderer.width(title);
         for (String value : values) {
-            longestValueWidth = Math.max(longestValueWidth, textRenderer.getWidth(value));
+            longestValueWidth = Math.max(longestValueWidth, textRenderer.width(value));
         }
         return Math.max(scaled(config, PANEL_MIN_WIDTH), padding * 2 + labelColumnWidth + longestValueWidth);
     }
@@ -247,12 +247,12 @@ public final class HudOverlayRenderer {
         return padding * 2 + rowHeight + rows * rowHeight;
     }
 
-    private int panelX(DrawContext context, AxisRulerConfig config, int width) {
-        return config.resolveHudX(context.getScaledWindowWidth(), width);
+    private int panelX(GuiGraphicsExtractor context, AxisRulerConfig config, int width) {
+        return config.resolveHudX(context.guiWidth(), width);
     }
 
-    private int panelY(DrawContext context, AxisRulerConfig config, int height) {
-        return config.resolveHudY(context.getScaledWindowHeight(), height);
+    private int panelY(GuiGraphicsExtractor context, AxisRulerConfig config, int height) {
+        return config.resolveHudY(context.guiHeight(), height);
     }
 
     private int scaled(AxisRulerConfig config, int value) {
@@ -260,12 +260,8 @@ public final class HudOverlayRenderer {
         return Math.max(1, Math.round(value * scale));
     }
 
-    private void drawText(DrawContext context, TextRenderer textRenderer, AxisRulerConfig config, String text, int x, int y, int color) {
-        if (config.hudTextShadow()) {
-            context.drawTextWithShadow(textRenderer, text, x, y, color);
-            return;
-        }
-        context.drawText(textRenderer, text, x, y, color, false);
+    private void drawText(GuiGraphicsExtractor context, Font textRenderer, AxisRulerConfig config, String text, int x, int y, int color) {
+        context.text(textRenderer, text, x, y, color, config.hudTextShadow());
     }
 
     private String compactWorld(MeasurePoint point) {
@@ -277,7 +273,7 @@ public final class HudOverlayRenderer {
     }
 
     private String tr(String key) {
-        return I18n.translate(key);
+        return I18n.get(key);
     }
 
     private String translatedTitle() {
@@ -285,7 +281,7 @@ public final class HudOverlayRenderer {
     }
 
     private static Identifier createHudId() {
-        Identifier identifier = Identifier.of(ModConstants.MOD_ID, "measurement_hud");
+        Identifier identifier = Identifier.fromNamespaceAndPath(ModConstants.MOD_ID, "measurement_hud");
         if (identifier == null) {
             throw new IllegalStateException("Failed to create AxisRuler HUD identifier");
         }
