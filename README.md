@@ -33,12 +33,12 @@ It is designed to feel like part of a polished building workflow, not an overlay
 
 ## Key Features
 
-- 🧱 Two-point measurement with clear X, Y, and Z readouts
+- Two-point measurement with clear X, Y, and Z readouts
 - Clean axis visualization for fast spatial understanding
 - Distance and alignment help directly in the world
 - Compact HUD for always-available measurement data
 - Overlay labels, guides, selection box, and connection line
-- 🎨 Full color control for overlay and HUD elements
+- Full color control for overlay and HUD elements
 - Built-in style presets plus custom preset saving
 - Live preview while editing colors and layout
 - Lightweight rendering designed for normal play sessions
@@ -60,7 +60,7 @@ AxisRuler immediately shows:
 
 ### Open the config
 
-Use Mod Menu to open the AxisRuler configuration screen.
+Use Mod Menu to open the AxisRuler configuration screen when running a supported release that includes the integration.
 
 From there, you can:
 
@@ -120,13 +120,15 @@ AxisRuler is designed for regular gameplay, long building sessions, and large pr
 - Optimized overlay rendering
 - No heavy background systems
 - Minimal visual overhead
-- ⚡ Works well with performance-focused clients, including Sodium
+- Works well with performance-focused clients, including Sodium
 
 The mod aims to stay responsive and readable even when it becomes part of your everyday toolset.
 
 ## Compatibility
 
 - Fabric
+- Legacy `1.21.11` release line preserved in branch `legacy/1.21.11`
+- `26.1.2` migration work isolated in branch `port/26.1.2` until the new release is complete
 - Client-side only
 - Safe to use on multiplayer servers
 - No server installation required
