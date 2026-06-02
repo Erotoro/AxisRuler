@@ -17,26 +17,36 @@ AxisRuler gives you:
 
 ## Use
 
-Set Point A, then Point B.
+AxisRuler works with `Alt` + keybinds.
 
-The mod shows:
+Basic workflow:
 
-- width on X
-- height on Y
-- depth on Z
-- the measured box in-world
-- the current result in the HUD
+1. Look at a block and press `Alt + Z` to set Point A
+2. Look at another block and press `Alt + X` to set Point B
+3. AxisRuler will show the X / Y / Z size in-world and in the HUD
 
-After Point A is set, AxisRuler previews the result on the block under your crosshair before you commit Point B.
-
-You can also pin the current finished measurement and keep it visible while working on something else.
+After Point A is set, the mod shows a live preview on the block under your crosshair before you confirm Point B.
 
 Default controls:
 
+- `Alt + Z` set Point A
+- `Alt + X` set Point B
+- `Alt + C` clear points
+- `Alt + V` swap points
+- `Alt + R` cycle measurement mode
+- `Alt + H` toggle HUD
+- `Alt + G` toggle guides
+- `Alt + L` toggle labels
+- `Alt + J` toggle connection line
+- `Alt + M` copy current measurement
 - `Alt + P` pin current measurement
 - `Alt + U` clear all pinned measurements
 
-Pinned measurements are session-only and clear when you leave the world.
+Pinned measurements let you keep finished boxes visible while working on something else.
+
+You can change the keybinds in:
+
+`Options -> Controls -> AxisRuler`
 
 ## Configuration
 
