@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "axisruler",
+  "version": "${version}",
+  "name": "AxisRuler",
+  "description": "Client-side visual block measurement tool for builders.",
+  "authors": [
+    "Erotoro"
+  ],
+  "contact": {
+    "homepage": "https://modrinth.com/mod/axisruler",
+    "sources": "https://github.com/Erotoro/AxisRuler",
+    "issues": "https://github.com/Erotoro/AxisRuler/issues"
+  },
+  "icon": "assets/axisruler/icon.png",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.erotoro.axisruler.mc1214.AxisRulerClient"
+    ],
+    "modmenu": [
+      "dev.erotoro.axisruler.mc1214.integration.modmenu.AxisRulerModMenuIntegration"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loaderVersion}",
+    "minecraft": "${minecraftRange}",
+    "java": ">=21",
+    "fabric-api": ">=${fabricVersion}"
+  },
+  "suggests": {
+    "modmenu": ">=${modmenuVersion}"
+  }
+}

@@ -1,80 +1,58 @@
 plugins {
-    id "net.fabricmc.fabric-loom" version "${loom_version}"
-    id "maven-publish"
+    id "java-base"
 }
 
-repositories {
-    mavenCentral()
-    maven {
-        name = "Quilt"
-        url = "https://maven.quiltmc.org/repository/release/"
-    }
-    maven {
-        name = "Terraformers"
-        url = "https://maven.terraformersmc.com/"
-    }
-}
-
-version = project.mod_version
 group = project.maven_group
+version = project.mod_version
 
-base {
-    archivesName = project.archives_base_name
-}
+subprojects {
+    apply plugin: "java"
 
-def releaseJarName = "axisruler-fabric-${project.minecraft_version}-v${project.version}.jar"
+    group = rootProject.group
+    version = rootProject.version
 
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    compileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
-}
+    repositories {
+        mavenCentral()
+        maven {
+            name = "Fabric"
+            url = uri("https://maven.fabricmc.net/")
+        }
+        maven {
+            name = "Terraformers"
+            url = uri("https://maven.terraformersmc.com/releases/")
+        }
+    }
 
-processResources {
-    inputs.property "version", project.version
-    inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "loader_version", project.loader_version
-    inputs.property "fabric_version", project.fabric_version
-    inputs.property "modmenu_version", project.modmenu_version
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+        withSourcesJar()
+    }
 
-    filesMatching("fabric.mod.json") {
-        expand(
-                "version": inputs.properties.version,
-                "minecraft_version": inputs.properties.minecraft_version,
-                "loader_version": inputs.properties.loader_version,
-                "fabric_version": inputs.properties.fabric_version,
-                "modmenu_version": inputs.properties.modmenu_version
-        )
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = "UTF-8"
+        options.release = 21
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = "UTF-8"
-    options.release = 25
-}
+// Minecraft 26.1.x requires the Java 25 toolchain; every other module stays on 21
+// so the shared core can be consumed by both platform modules.
+def mc261x = findProject(":axisruler-mc261x")
+if (mc261x != null) {
+    configure(mc261x) {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(25)
+            }
+        }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-    withSourcesJar()
-}
-
-jar {
-    archiveFileName = releaseJarName
-    from("LICENSE") {
-        rename { "${it}_${project.archives_base_name}" }
-    }
-}
-
-publishing {
-    publications {
-        create("mavenJava", MavenPublication) {
-            artifactId = project.archives_base_name
-            from components.java
+        tasks.withType(JavaCompile).configureEach {
+            options.release = 25
         }
     }
 }

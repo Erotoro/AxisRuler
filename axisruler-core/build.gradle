@@ -1,0 +1,16 @@
+plugins {
+    id "java-library"
+}
+
+base {
+    archivesName = "${mod_id}-core"
+}
+
+dependencies {
+    implementation "com.google.code.gson:gson:2.13.1"
+    implementation "org.slf4j:slf4j-api:2.0.16"
+
+    testImplementation platform("org.junit:junit-bom:5.13.4")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}

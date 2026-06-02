@@ -1,0 +1,44 @@
+plugins {
+    id "net.fabricmc.fabric-loom" version "${fabric_loom_version}"
+}
+
+base {
+    archivesName = "${mod_id}-mc261x"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_261x}"
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_261x}"
+    compileOnly "com.terraformersmc:modmenu:${modmenu_261x}"
+
+    implementation project(":axisruler-core")
+}
+
+// Bundle the shared core classes/sources straight into the platform jar so the
+// distributed mod is a single self-contained file.
+jar {
+    from(project(":axisruler-core").sourceSets.main.output)
+}
+
+sourcesJar {
+    from(project(":axisruler-core").sourceSets.main.allSource)
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraftRange", minecraft_range_261x
+    inputs.property "loaderVersion", fabric_loader_version
+    inputs.property "fabricVersion", fabric_api_261x
+    inputs.property "modmenuVersion", modmenu_261x
+
+    filesMatching("fabric.mod.json") {
+        expand(
+                version: project.version,
+                minecraftRange: minecraft_range_261x,
+                loaderVersion: fabric_loader_version,
+                fabricVersion: fabric_api_261x,
+                modmenuVersion: modmenu_261x
+        )
+    }
+}

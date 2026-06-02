@@ -1,0 +1,43 @@
+plugins {
+    id "net.fabricmc.fabric-loom-remap" version "${fabric_loom_version}"
+}
+
+base {
+    archivesName = "${mod_id}-mc1214"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_1214}"
+    mappings "net.fabricmc:yarn:${yarn_mappings_1214}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_1214}"
+    modCompileOnly "com.terraformersmc:modmenu:${modmenu_1214}"
+
+    implementation project(":axisruler-core")
+}
+
+jar {
+    from(project(":axisruler-core").sourceSets.main.output)
+}
+
+sourcesJar {
+    from(project(":axisruler-core").sourceSets.main.allSource)
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraftRange", minecraft_range_1214
+    inputs.property "loaderVersion", fabric_loader_version
+    inputs.property "fabricVersion", fabric_api_1214
+    inputs.property "modmenuVersion", modmenu_1214
+
+    filesMatching("fabric.mod.json") {
+        expand(
+                version: project.version,
+                minecraftRange: minecraft_range_1214,
+                loaderVersion: fabric_loader_version,
+                fabricVersion: fabric_api_1214,
+                modmenuVersion: modmenu_1214
+        )
+    }
+}
