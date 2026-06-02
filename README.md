@@ -62,7 +62,7 @@ AxisRuler currently supports:
 
 There are separate release files for each Minecraft branch.
 
-Release files in `download/`:
+Release files:
 
 - `axisruler-mc1214-1.1.0.jar`
 - `axisruler-mc1218-1.1.0.jar`
